@@ -10,7 +10,8 @@ import { clamp, rngFor } from './rng.ts';
 import type { Rng } from './rng.ts';
 import { genreCost, makeContract, makeCtx, makeProgram, makeTalent } from './setup.ts';
 import { avgWeeklyRevenue, getProgram, nextId, npcById, npcByRole, playerStation, pushTimeline, rivals } from './state.ts';
-import type { BandId, GameState, GenreId, MarketOffer, Program } from './types.ts';
+import { availableAt, catalogGenre, exclusiveRight, holderName, lockLabel, recordDivergence, stationArticle, titleById } from './catalogWorld.ts';
+import type { BandId, CatalogTitleSnap, GameState, GenreId, MarketOffer, Program, RatingAge } from './types.ts';
 import { COPAS, monthOf, yearOf } from './time.ts';
 
 const PROJECT_GENRES: GenreId[] = ['novela_18h', 'novela_19h', 'novela_21h', 'serie_nacional', 'humoristico', 'auditorio', 'talk_show', 'revista_eletronica', 'policial', 'feminino', 'musical', 'game_show', 'documentario', 'novela_juvenil', 'novela_biblica', 'infantil'];
@@ -68,10 +69,83 @@ export function makeOffer(state: GameState, kind: MarketOffer['kind'], rng: Rng,
   return o;
 }
 
+// ===== títulos reais do catálogo (v2, seção 8A) =====
+
+const CATALOG_KINDS: Partial<Record<MarketOffer['kind'], string[]>> = {
+  enlatado: ['novela', 'serie', 'minisserie', 'desenho', 'documentario'],
+  filmes: ['filme', 'pacote_filmes'],
+  formato: ['formato', 'reality'],
+};
+const KIND_LABEL: Record<string, string> = {
+  novela: 'Novela', serie: 'Série', minisserie: 'Minissérie', desenho: 'Desenho', documentario: 'Documentário',
+  filme: 'Filme', pacote_filmes: 'Pacote de filmes', formato: 'Formato', reality: 'Reality',
+};
+
+export function stationNameByKey(state: GameState, key: string): string {
+  return state.stations.find((s) => s.realKey === key)?.name ?? key.toUpperCase();
+}
+
+// Oferta de um título real ainda livre na partida; null quando não há nenhum (o mercado completa com ofertas fictícias)
+function catalogOffer(state: GameState, kind: MarketOffer['kind'], rng: Rng, opt: { genre?: GenreId; premium?: boolean }): MarketOffer | null {
+  const kinds = CATALOG_KINDS[kind];
+  if (!state.catalog || !kinds) return null;
+  const date = state.meta.date;
+  const ps = playerStation(state);
+  const taken = new Set<string>();
+  for (const p of state.programs) if (p.catalogTitleId) taken.add(p.catalogTitleId);
+  for (const o of state.offers) if (o.catalogTitleId) taken.add(o.catalogTitleId);
+  const pool = state.catalog.titles.filter((t) => kinds.includes(t.kind) && !taken.has(t.id) && availableAt(t, date)
+    && (!opt.genre || catalogGenre(t) === opt.genre)
+    && (!opt.premium || (t.attrs.quality ?? 0) + (t.attrs.appeal ?? 0) >= 140));
+  const lockOf = (t: CatalogTitleSnap) => {
+    const r = exclusiveRight(state, t, date);
+    return r && r.stationKey !== ps.realKey ? r : null;
+  };
+  // exclusivos de outras emissoras aparecem, mas com menos frequência (não dá para comprar)
+  const t = rng.weighted(pool, (x) => (lockOf(x) ? 0.35 : 1));
+  if (!t) return null;
+  const era = state.meta.era;
+  const g = catalogGenre(t);
+  const q = t.attrs.quality ?? rng.normal(56, 10);
+  const a = t.attrs.appeal ?? rng.normal(60, 10);
+  const o = baseOffer(state, rng, kind, g, q, a);
+  o.catalogTitleId = t.id;
+  o.title = t.titleBr;
+  o.durStd = t.durationMin ? Math.max(15, Math.round(t.durationMin / 15) * 15) : GENRES[g].dur[0];
+  if (t.attrs.rating && ['L', '10', '12', '14', '16', '18'].includes(t.attrs.rating)) o.rating = t.attrs.rating as RatingAge;
+  const holder = holderName(state, t.holderId);
+  const aired = t.brStations.length ? ` Já passou no Brasil: ${t.brStations.map((k) => stationNameByKey(state, k)).join(', ')}.` : ' Sem exibição registrada na TV aberta brasileira.';
+  o.description = `${KIND_LABEL[t.kind] ?? 'Título'}${t.country ? ` · ${t.country}` : ''}${t.year ? ` · ${t.year}` : ''}${holder ? ` · ${holder}` : ''}.${aired} Atributos de jogo são estimativas.`;
+  if (kind === 'formato') {
+    o.origin = 'format';
+    o.costPerEp = genreCost(era, g, q, o.durStd, 0.85);
+    o.price = Math.round(o.costPerEp * rng.range(4, 8));
+    o.weeksToAir = rng.int(8, 16);
+    o.episodes = t.episodes ?? (GENRES[g].episodes ? rng.int(GENRES[g].episodes![0], GENRES[g].episodes![1]) : null);
+  } else if (kind === 'filmes') {
+    const premium = q + a >= 140;
+    o.exhibitions = (t.kind === 'pacote_filmes' ? t.episodes ?? 10 : 1) * (t.attrs.exibicoes_por_titulo ?? 3);
+    o.costPerEp = Math.round(genreCost(era, 'filme', q, o.durStd, premium ? 1 : 0.5) * (premium ? 1.1 : 0.6));
+    o.price = premium ? Math.round(o.costPerEp * rng.range(2, 4)) : 0;
+  } else {
+    o.episodes = t.episodes ?? rng.int(22, 90);
+    o.exhibitions = o.episodes * 2;
+    o.costPerEp = Math.round(genreCost(era, g, q, o.durStd, 0.6) * 0.25);
+    o.weeksToAir = rng.int(0, 2);
+  }
+  const lock = lockOf(t);
+  if (lock) o.lockedBy = { stationKey: lock.stationKey, stationName: stationNameByKey(state, lock.stationKey), until: lock.until };
+  return o;
+}
+
 function makeOfferRaw(state: GameState, kind: MarketOffer['kind'], rng: Rng, opt: { genre?: GenreId; premium?: boolean; programId?: string; npcId?: string } = {}): MarketOffer | null {
   const era = state.meta.era;
   const year = yearOf(state.meta.date);
   const avgRev = avgWeeklyRevenue(state);
+  if (state.catalog) {
+    const real = catalogOffer(state, kind, rng, opt);
+    if (real) return real;
+  }
   switch (kind) {
     case 'enlatado': {
       const g: GenreId = rng.chance(0.2) ? 'novela_18h' : 'serie_estrangeira';
@@ -259,6 +333,8 @@ export function specialOffer(state: GameState, key: string, programId: string | 
     case 'acervo_rival': {
       const o = makeOffer(state, 'enlatado', rng);
       if (!o) return null;
+      o.catalogTitleId = undefined;
+      o.lockedBy = undefined;
       o.kind = 'enlatado';
       o.title = `Acervo de novelas da concorrência (${rng.int(2, 3)} títulos)`;
       o.genre = 'novela_19h';
@@ -361,6 +437,7 @@ function programFromOffer(state: GameState, o: MarketOffer, status: Program['sta
   p.habitKey = '';
   p.createdWeek = state.meta.weekIndex;
   p.premiereWeek = null;
+  if (o.catalogTitleId) p.catalogTitleId = o.catalogTitleId;
   if (o.episodes) p.episodes = { total: o.episodes, aired: 0, planned: o.episodes };
   else p.episodes = { total: null, aired: 0, planned: null };
   if (o.exhibitions) p.rights = { exhibitionsLeft: o.exhibitions, untilWeek: null };
@@ -379,6 +456,7 @@ export function buyOffer(state: GameState, offerId: string, bid?: number): BuyRe
   if (!o) return { ok: false, message: 'Oferta não encontrada ou expirada.' };
   const era = state.meta.era;
   const ps = playerStation(state);
+  if (o.lockedBy) return { ok: false, message: `"${o.title}" é ${lockLabel(o.lockedBy)}. Não está à venda.` };
   switch (o.kind) {
     case 'leilao': {
       if (!o.auction) return { ok: false, message: 'Leilão inválido.' };
@@ -439,6 +517,12 @@ export function buyOffer(state: GameState, offerId: string, bid?: number): BuyRe
   chargeAcquisition(state, o.price);
   state.offers = state.offers.filter((x) => x.id !== o.id);
   pushTimeline(state, `${develop ? 'Aprovou o projeto' : 'Comprou'} "${p.title}".`, 'mercado');
+  // título real que, na história, passou em outra emissora: a partida se afasta do Brasil real
+  const t = titleById(state, o.catalogTitleId);
+  if (t && t.brStations.length && !t.brStations.includes(ps.realKey ?? '')) {
+    const where = t.brStations.map((k) => { const n = stationNameByKey(state, k); return `${stationArticle(n).em} ${n}`; }).join(' e ');
+    recordDivergence(state, { date: state.meta.date, productRef: t.id, description: `${ps.name} comprou "${t.titleBr}", que no Brasil real passou ${where}.` });
+  }
   const msg = develop
     ? `"${p.title}" entrou em desenvolvimento: estreia possível em ${o.weeksToAir} semanas.`
     : o.weeksToAir > 0

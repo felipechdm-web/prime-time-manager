@@ -432,6 +432,47 @@ export interface MarketOffer {
   origin: ProgramOrigin;
   special?: boolean;
   flagCopa?: number;
+  catalogTitleId?: string; // v2: oferta de um título real do catálogo
+  lockedBy?: { stationKey: string; stationName: string; until: string | null }; // exclusivo de outra emissora: visível, sem compra
+}
+
+// ===== catálogo real (v2, seção 8A): cópia dos itens aprovados, guardada na partida ao ser criada =====
+export interface CatalogTitleSnap {
+  id: string;
+  titleBr: string;
+  titleOriginal: string | null;
+  kind: string;
+  country: string | null;
+  holderId: string | null;
+  year: number | null;
+  episodes: number | null;
+  durationMin: number | null;
+  availableFrom: string | null;
+  availableTo: string | null;
+  attrs: { genre?: string; quality?: number; appeal?: number; fatigue?: number; rating?: string; exibicoes_por_titulo?: number };
+  brStations: string[]; // emissoras que exibiram o título na história real (para registrar divergências)
+}
+
+export interface CatalogSlotSnap {
+  dias: string;
+  inicio: string;
+  fim: string;
+  titulo: string;
+  genero: string;
+  catalog_title_id?: string;
+}
+
+export interface CatalogSnapshot {
+  titles: CatalogTitleSnap[];
+  grids: { stationKey: string; referenceMonth: string; slots: CatalogSlotSnap[] }[];
+  rights: { productRef: string; holderStationKey: string; validFrom: string | null; validTo: string | null; exclusive: boolean }[];
+  holders: { id: string; name: string }[];
+}
+
+export interface Divergence {
+  date: string;
+  description: string;
+  productRef: string;
 }
 
 export interface FinanceState {
@@ -586,6 +627,9 @@ export interface GameState {
   lastBandRanks: Record<string, number>; // posição do jogador por faixa na última semana
   monthScores: { month: string; score: number }[];
   ytd: { weeks: number; pts24: number; prime: number };
+  catalog?: CatalogSnapshot; // v2: catálogo real aprovado no momento da criação (só no modo real com Supabase)
+  divergences?: Divergence[]; // v2: onde a partida se afastou da história real
+  pendingDivergences?: Divergence[]; // gravadas na tabela divergences pelo servidor, como a caixa de saída
 }
 
 export interface InboxDraft {

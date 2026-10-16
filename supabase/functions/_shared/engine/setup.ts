@@ -11,8 +11,9 @@ import { leaseRate } from './commercial.ts';
 import { clamp, Rng, rngFor } from './rng.ts';
 import { emptyWeek, ensureSystemPrograms, habitKeyFor, placeBlock } from './schedule.ts';
 import { nextId } from './state.ts';
+import { availableAt, catalogGenre, exclusiveRight, parseDays, pickGrid, titleById } from './catalogWorld.ts';
 import type {
-  ArchetypeId, Background, Block, Contract, DayType, Difficulty, EraId, GameState, GenreId, Npc, Program,
+  ArchetypeId, Background, Block, CatalogSnapshot, CatalogTitleSnap, Contract, DayType, Difficulty, EraId, GameState, GenreId, Npc, Program,
   RatingAge, ScenarioId, Station, Universe,
 } from './types.ts';
 import { bandOfSlot, clockToSlot, COPAS, firstMondayOfYear, slotClockMinutes } from './time.ts';
@@ -27,6 +28,7 @@ export interface NewGameInput {
   player: { name: string; background: Background; pronoun: 'o' | 'a' | 'e' };
   station: { mode: 'fictional' | 'real'; realKey?: string; name?: string; short?: string; color?: string };
   carry?: { reputation: number; careerStations: string[] };
+  catalog?: CatalogSnapshot | null; // v2: catálogo real aprovado (só no modo real; sem ele, o mundo é gerado como antes)
 }
 
 export const SCENARIOS: Record<ScenarioId, { name: string; situation: string; difficulty: string; template: string; archetype: ArchetypeId; power: number; rep: [number, number, number]; cashWeeks: number }> = {
@@ -386,6 +388,93 @@ function buildGrid(ctx: Ctx, st: Station, templateKey: string): Block[][] {
   return week;
 }
 
+// ===== catálogo real (v2, seção 8A) =====
+
+// Programa da partida a partir de um título real: atributos do catálogo (estimativas de jogo) sobre o sorteio padrão.
+export function programFromCatalog(ctx: Ctx, st: Station, t: CatalogTitleSnap, opts: { minutes: number; slot?: number; status?: Program['status']; rerun?: boolean }): Program {
+  const g = catalogGenre(t);
+  const origin: Program['origin'] = t.kind === 'formato' || t.kind === 'reality' ? 'format' : t.country && /brasil/i.test(t.country) ? 'own' : 'acquired';
+  const p = makeProgram(ctx, st, g, { title: t.titleBr, minutes: opts.minutes, slot: opts.slot, status: opts.status, rerun: opts.rerun, origin });
+  p.catalogTitleId = t.id;
+  if (typeof t.attrs.quality === 'number') p.quality = clamp(Math.round(t.attrs.quality), 8, 97);
+  if (typeof t.attrs.appeal === 'number') p.appeal = clamp(Math.round(t.attrs.appeal), 5, 97);
+  if (typeof t.attrs.fatigue === 'number') p.fatigue = clamp(t.attrs.fatigue, 0, 100);
+  if (t.attrs.rating && RATING_ORDER.includes(t.attrs.rating as RatingAge)) p.rating = t.attrs.rating as RatingAge;
+  if (GENRES[g].episodes && t.episodes) {
+    const onAir = (opts.status ?? 'on_air') === 'on_air';
+    const aired = onAir ? Math.floor(t.episodes * ctx.rng.range(0.1, 0.6)) : 0;
+    p.episodes = { total: t.episodes, aired, planned: t.episodes };
+  }
+  if (origin === 'acquired') {
+    p.rights = { exhibitionsLeft: g === 'filme' ? (t.episodes ?? 10) * (t.attrs.exibicoes_por_titulo ?? 3) : (t.episodes ?? 80) * 2, untilWeek: null };
+  }
+  return p;
+}
+
+// Grade real de uma emissora sobre a grade do modelo genérico: o modelo só preenche o que a grade real não cobre.
+function overlayRealGrid(ctx: Ctx, st: Station, week: Block[][], grid: NonNullable<ReturnType<typeof pickGrid>>): Block[][] {
+  const out = week.map((d) => d.map((b) => ({ ...b })));
+  const byKey = new Map<string, Program>();
+  for (const sl of grid.slots) {
+    let g = sl.genero as GenreId;
+    if (!(g in GENRES) || g === 'futebol') continue; // jogos entram com a Fase 6.4 (esporte)
+    if (g === 'janela_local' && !st.hasNetwork) g = 'telejornal';
+    const days = parseDays(sl.dias);
+    const start = clockToSlot(sl.inicio);
+    const len = Math.min((clockToSlot(sl.fim) - start + 96) % 96, 96 - start); // não atravessa as 6h
+    if (!days.length || len <= 0) continue;
+    const t = titleById(ctx.state, sl.catalog_title_id);
+    const key = t ? `cat:${t.id}` : `${sl.titulo}|${g}`;
+    let p = byKey.get(key);
+    if (!p) {
+      p = t ? programFromCatalog(ctx, st, t, { minutes: len * 15, slot: start }) : makeProgram(ctx, st, g, { title: sl.titulo, label: sl.titulo, minutes: len * 15, slot: start });
+      if (t && sl.titulo) p.title = sl.titulo; // nome no ar (ex.: "BBB 26"); o vínculo com o catálogo fica em catalogTitleId
+      if (g === 'telejornal' && start >= 48 && start < 66) p.locked = true; // telejornal principal protegido
+      byKey.set(key, p);
+    }
+    for (const d of days) out[d] = placeBlock(out[d], p.id, start, len);
+  }
+  // sobras do modelo genérico com até 30 min entre dois programas reais viram parte do programa real vizinho
+  const realIds = new Set([...byKey.values()].map((p) => p.id));
+  for (let d = 0; d < out.length; d++) {
+    for (const b of [...out[d]]) {
+      if (realIds.has(b.programId) || b.len > 2) continue;
+      const prev = out[d].find((x) => x.start + x.len === b.start && realIds.has(x.programId));
+      const next = out[d].find((x) => x.start === b.start + b.len && realIds.has(x.programId));
+      const host = prev ?? next;
+      if (host) out[d] = placeBlock(out[d], host.programId, b.start, b.len);
+    }
+  }
+  // programas do modelo genérico que ficaram sem horário saem da partida
+  const used = new Set(out.flat().map((b) => b.programId));
+  ctx.state.programs = ctx.state.programs.filter((p) => p.stationId !== st.id || p.status !== 'on_air' || used.has(p.id));
+  return out;
+}
+
+// Acervo do jogador no Brasil real: o acervo real da emissora assumida, ou alguns enlatados reais baratos (seção 8A.2)
+function playerCatalogAcervo(ctx: Ctx, ps: Station): void {
+  const cat = ctx.state.catalog;
+  if (!cat) return;
+  const date = ctx.state.meta.date;
+  const used = new Set(ctx.state.programs.map((p) => p.catalogTitleId).filter((x): x is string => !!x));
+  const free = cat.titles.filter((t) => !used.has(t.id) && availableAt(t, date));
+  const minutesOf = (t: CatalogTitleSnap) => t.durationMin ?? GENRES[catalogGenre(t)].dur[0];
+  if (ps.realKey) {
+    const own = free.filter((t) => exclusiveRight(ctx.state, t, date)?.stationKey === ps.realKey).slice(0, 4);
+    for (const t of own) programFromCatalog(ctx, ps, t, { minutes: minutesOf(t), slot: 40, status: 'ready', rerun: true });
+    return;
+  }
+  const score = (t: CatalogTitleSnap) => (t.attrs.quality ?? 60) + (t.attrs.appeal ?? 60) - (t.attrs.fatigue ?? 0);
+  const cheap = free
+    .filter((t) => ['serie', 'filme', 'pacote_filmes', 'desenho'].includes(t.kind) && !exclusiveRight(ctx.state, t, date))
+    .sort((a, b) => score(a) - score(b) || a.id.localeCompare(b.id))
+    .slice(0, 3);
+  for (const t of cheap) {
+    const p = programFromCatalog(ctx, ps, t, { minutes: minutesOf(t), slot: 40, status: 'ready' });
+    p.costPerEp = Math.round(p.costPerEp * 0.6);
+  }
+}
+
 const RESERVE_GENRES: Record<ArchetypeId, string[]> = {
   hegemonica: ['novela_21h', 'serie_nacional', 'humoristico', 'reality|game_show', 'novela_19h'],
   popular_auditorio: ['auditorio', 'game_show', 'novela_18h', 'talent_show|game_show'],
@@ -684,13 +773,19 @@ export function createWorld(input: NewGameInput): GameState {
     if (st.kind === 'pay') st.footballUntilYear = null;
   }
 
+  // catálogo real aprovado (v2): só no Brasil real
+  if (input.universe === 'real' && input.catalog) state.catalog = input.catalog;
+
   // grades e acervo
   for (const st of state.stations) {
     const key = st.isPlayer ? playerTemplate : st.archetype;
     state.schedules[st.id] = buildGrid(ctx, st, key);
+    const realGrid = state.catalog && st.realKey ? pickGrid(state.catalog, st.realKey, startDate) : null;
+    if (realGrid) state.schedules[st.id] = overlayRealGrid(ctx, st, state.schedules[st.id], realGrid);
     if (!st.isPlayer) addReserves(ctx, st);
   }
   playerExtras(ctx, playerSt, scenario);
+  if (state.catalog) playerCatalogAcervo(ctx, playerSt);
   ensureSystemPrograms(state);
 
   // hábito: assinatura do horário atual

@@ -476,6 +476,7 @@ export function basePayload(state: GameState, extra: Record<string, unknown> = {
     pending_events: state.events.filter((e) => !e.resolved).map((e) => ({ id: e.id, titulo: e.title })),
     arcos_ativos: state.arcs.filter((a) => !a.done).map((a) => ({ chave: a.key, etapa: a.stage })),
     rivais: rivals(state).map((s) => s.name),
+    ...(state.divergences?.length ? { divergencias_da_historia: state.divergences.slice(-5).map((d) => `${d.date}: ${d.description}`) } : {}),
     ...extra,
   };
 }

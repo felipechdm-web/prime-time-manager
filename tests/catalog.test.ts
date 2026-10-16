@@ -76,7 +76,7 @@ test('lote 1 de 2026: válido pelas regras do Editor, sem aprovação e com font
   const { TITLES, HOLDERS, GRIDS } = await import('../supabase/seeds/catalogo_2026_lote1.ts');
   const built = buildLote1();
   assert.deepEqual(built.problems, []);
-  assert.equal(built.counts.titulos, 60);
+  assert.equal(built.counts.titulos, 64);
   assert.deepEqual(GRIDS.map((g) => g.station_key).sort(), ['band', 'globo', 'record', 'sbt']);
   for (const x of [...TITLES, ...HOLDERS]) assert.ok(x.notes.length > 10, `${x.id} sem nota de fonte`);
   // representantes das empresas são sempre fictícios
@@ -84,7 +84,7 @@ test('lote 1 de 2026: válido pelas regras do Editor, sem aprovação e com font
   // o CSV gerado volta pela importação do Editor sem erros
   const back = csvToCatalogRows('catalog_titles', built.csv.catalog_titles!);
   assert.equal(back.rows.filter((r) => r.errors.length).length, 0);
-  assert.equal(back.rows.length, 60);
+  assert.equal(back.rows.length, 64);
 });
 
 test('catalog-admin: só o dono edita; valida antes de gravar; aprova, corrige e apaga', async () => {

@@ -13,6 +13,7 @@ export interface BuiltSeed {
   sql: string;
   csv: Partial<Record<CatalogTable, string>>;
   counts: Record<string, number>;
+  rows: Record<'rights_holders' | 'catalog_titles' | 'schedule_templates' | 'historical_rights', Record<string, unknown>[]>;
 }
 
 const q = (v: unknown): string => {
@@ -40,30 +41,57 @@ begin
   end if;
 end $$;`;
 
-// Correção de uma grade já carregada: troca a grade pendente (não aprovada) da emissora pela versão atual do lote.
-// Grades já aprovadas no Editor não são tocadas.
-export function buildGridFix(stationKey: string): { problems: string[]; sql: string } {
-  const g = GRIDS.find((x) => x.station_key === stationKey);
-  if (!g) return { problems: [`grade "${stationKey}" não existe no lote`], sql: '' };
+// Ajustes de 17/10/2026 para um banco que já tem o lote 1 (aprovado pelo Felipe, menos a grade do SBT):
+// grade do SBT em janeiro de 2026, 4 novelas novas (pendentes), nota do The Voice corrigida e direito The Voice → SBT.
+// O que já foi aprovado continua aprovado; os itens novos entram pendentes.
+export const AJUSTES_TITULOS = ['marisol', 'a_desalmada', 'presente_de_amor', 'amor_valente'];
+export const AJUSTES_DIREITOS = [2608];
+
+export function buildLote1Ajustes(): { problems: string[]; sql: string } {
   const built = buildLote1();
-  const row = normalizeCatalogRow('schedule_templates', { era_id: ERA, station_key: g.station_key, reference_month: g.reference_month ?? REFERENCE_MONTH, slots: g.slots, confidence: g.confidence, notes: g.notes, batch: BATCH });
-  const problems = [...built.problems, ...row.errors];
-  const cols = Object.keys(row.row);
-  const sql = `-- Prime Time Manager — correção da grade "${stationKey}" do ${BATCH}.
+  const problems = [...built.problems];
+  const norm = (table: CatalogTable, label: string, rawRow: Record<string, unknown>) => {
+    const n = normalizeCatalogRow(table, { ...rawRow, batch: BATCH });
+    for (const e of n.errors) problems.push(`${table} ${label}: ${e}`);
+    return n.row;
+  };
+  const sbt = GRIDS.find((g) => g.station_key === 'sbt');
+  if (!sbt) problems.push('grade do SBT não existe no lote');
+  const grid = sbt ? norm('schedule_templates', 'sbt', { era_id: ERA, station_key: 'sbt', reference_month: sbt.reference_month ?? REFERENCE_MONTH, slots: sbt.slots, confidence: sbt.confidence, notes: sbt.notes }) : {};
+  const titles = AJUSTES_TITULOS.map((id) => {
+    const t = TITLES.find((x) => x.id === id);
+    if (!t) problems.push(`título ${id} não existe no lote`);
+    return t ? norm('catalog_titles', id, { ...t }) : {};
+  });
+  const voice = TITLES.find((x) => x.id === 'the_voice');
+  if (!voice) problems.push('título the_voice não existe no lote');
+  const rights = AJUSTES_DIREITOS.map((id) => {
+    const r = RIGHTS.find((x) => x.id === id);
+    if (!r) problems.push(`direito ${id} não existe no lote`);
+    return r ? norm('historical_rights', String(id), { ...r, era_id: ERA }) : {};
+  });
+  const sql = `-- Prime Time Manager — ajustes do ${BATCH} (17/10/2026).
 -- Gerado por scripts/gen-catalog-seed.ts. Cole no SQL Editor do Supabase e clique em Run.
--- Apaga a grade pendente (não aprovada) desta emissora e grava a versão corrigida, também pendente:
--- aprove no Editor de Catálogo depois de conferir. Grades já aprovadas não são alteradas.
+-- 1) Grade do SBT alinhada a janeiro de 2026: apaga a grade do SBT deste lote (a de janeiro antiga e, se você
+--    já tiver rodado a correção anterior, a de outubro) e grava a nova, pendente para revisão.
+-- 2) Quatro novelas novas, pendentes: Marisol, A Desalmada, Presente de Amor e Amor Valente.
+-- 3) Nota do The Voice corrigida (continua aprovado) e direito The Voice → SBT, pendente.
+-- Nada do que você já aprovou deixa de estar aprovado. Pode rodar de novo sem problemas.
 
 ${CATALOG_GUARD}
 
 begin;
 
 delete from public.schedule_templates
-where era_id = '${ERA}' and station_key = ${q(stationKey)} and approved = false;
+where era_id = '${ERA}' and station_key = 'sbt' and batch = ${q(BATCH)};
+${insertSql('schedule_templates', [grid], '(era_id, station_key, reference_month)')}
+${insertSql('catalog_titles', titles, '(id)')}
+update public.catalog_titles
+set notes = ${q(voice?.notes ?? '')}, br_history = ${q(voice?.br_history ?? [])}, updated_at = now()
+where id = 'the_voice';
 
-insert into public.schedule_templates (${cols.join(', ')}) values
-  (${cols.map((c) => q(row.row[c])).join(', ')})
-on conflict (era_id, station_key, reference_month) do nothing;
+${insertSql('historical_rights', rights, '(id)')}
+select setval(pg_get_serial_sequence('public.historical_rights', 'id'), greatest((select max(id) from public.historical_rights), 1));
 
 commit;
 `;
@@ -134,5 +162,6 @@ commit;
       historical_rights: catalogRowsToCSV('historical_rights', rights),
     },
     counts: { players: holders.length, titulos: titles.length, grades: grids.length, faixas: GRIDS.reduce((n, g) => n + g.slots.length, 0), direitos: rights.length },
+    rows: { rights_holders: holders, catalog_titles: titles, schedule_templates: grids, historical_rights: rights },
   };
 }

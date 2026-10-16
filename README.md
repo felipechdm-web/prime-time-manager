@@ -76,6 +76,15 @@ prime-time-manager/
 - **Uma era só (v2.1, 17/10/2026)**: o jogo tem apenas a era atual. As eras de 1983 a 2019 foram retiradas
   (catálogo, eventos, temas visuais e a transição entre eras); o motor continua lendo os parâmetros da era, agora
   com um único conjunto. Os números de 2026 ficaram idênticos aos de antes da mudança. Valores em R$ de 2026.
+- **Catálogo real na partida (v2, seção 8A)**: `create-game` copia o que está aprovado no catálogo para dentro da
+  partida (`state.catalog`); edições posteriores no Editor só valem para partidas novas. Com a cópia, as emissoras
+  reais começam com a grade de referência do mês (o modelo genérico só preenche as lacunas; jogos de futebol ficam
+  para a Fase 6.4), quem assume uma emissora real recebe o acervo dela, e uma emissora fictícia recebe três
+  enlatados reais baratos. O Mercado oferece primeiro títulos reais livres e completa com ofertas fictícias;
+  títulos com exclusividade de outra emissora aparecem travados. Comprar um título que na história passou em
+  outra emissora registra uma divergência (`divergences`), que o Mestre pode comentar. Sem catálogo aprovado, no
+  Brasil fictício e no modo demonstração, o mundo é gerado exatamente como antes (mesma semente, mesmos números).
+  Atributos de jogo dos títulos são estimativas, nunca audiência oficial.
 - **Modelos (v2, seção 17.5)**: todas as funções usam `claude-haiku-5-5` com esforço baixo e raciocínio desligado;
   cada função tem o seu `max_tokens` (`supabase/functions/_shared/game/llmConfig.ts`). O Sonnet 5.5 fica como
   modo premium desligado (`LLM_PREMIUM=on` liga, só na avaliação com a presidência). Tudo pode ser trocado por

@@ -21,15 +21,19 @@ guarda o código, publica as funções no Supabase e hospeda o site (GitHub Page
 2. Abra o arquivo `supabase/setup_completo.sql` deste projeto (no Bloco de Notas, por exemplo), copie **tudo** e cole no editor.
 3. Clique em **Run**. Deve aparecer "Success". (Pode rodar de novo sem problema: ele atualiza o catálogo e preserva
    as partidas de 2026. O jogo tem só a era atual; partidas antigas de outras eras, se existirem, são apagadas.)
-4. Confira em **Table Editor** (schema `public`). O script cria **29 tabelas** — é normal aparecerem todas:
+4. Confira em **Table Editor** (schema `public`). O script cria **30 tabelas** — é normal aparecerem todas:
    - **Catálogo do jogo** (já vêm preenchidas): `eras` (1 linha: a era atual, 2026), `era_rules` (8), `genres` (29),
      `event_templates` (77), `markets` (15), `station_archetypes` e `npc_archetypes`. Basta conferir essas contagens.
    - **Catálogo real** (começam vazias e recebem os lotes de títulos reais): `rights_holders`, `catalog_titles`,
      `schedule_templates`, `historical_rights`, `clubs` e `club_fanbase`.
    - **Dados das partidas** (começam **vazias** e se enchem quando você joga): `games`, `reports`, `inbox_messages`,
      `conversations`, `messages`, `npc_memories`, `events_log`, `ratings_slots`, `ratings_minute`, `weekly_stats`,
-     `finance_ledger`, `competitor_actions`, `kpi_snapshots`, `campaign_summaries`, `player_intents` e `llm_calls`
-     (esta última registra o custo de cada chamada à Claude).
+     `finance_ledger`, `competitor_actions`, `kpi_snapshots`, `campaign_summaries`, `player_intents`, `llm_calls`
+     (registra o custo de cada chamada à Claude) e `divergences` (quando a partida se afasta da história real, por
+     exemplo ao comprar uma novela que no Brasil passou em outra emissora).
+   - **Partidas novas no Brasil real usam o catálogo aprovado**: grades reais das emissoras, títulos reais no Mercado e
+     exclusividades (ex.: novela da Televisa aparece "exclusivo do SBT até 12/2028", sem botão de compra). Só entra o
+     que estiver **aprovado** no Editor de Catálogo; cada partida guarda uma cópia do catálogo do dia em que foi criada.
    - Você não precisa mexer em nenhuma delas. A proteção (cada jogador só vê os próprios dados) é feita pelas
      regras de RLS que o script já criou.
 

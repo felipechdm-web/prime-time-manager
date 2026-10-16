@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { GENRES } from '@engine/catalog/genres.ts';
 import { DEV_STAGES } from '@engine/market.ts';
+import { lockLabel } from '@engine/catalogWorld.ts';
 import type { MarketOffer, Program } from '@engine/types.ts';
 import { useAction } from '../lib/queries.ts';
 import { useUI } from '../lib/ui.ts';
@@ -69,6 +70,7 @@ export function Acervo({ gameId, state }: ScreenProps) {
                     <div className="flex flex-wrap items-center gap-1.5">
                       <GenreChip genre={p.genre} small />
                       {p.isRerun && <Badge>reprise</Badge>}
+                      {p.catalogTitleId && <Badge>título real</Badge>}
                       {p.origin === 'leased' && <Badge tone="warn">arrendado</Badge>}
                       <span className="text-[11px] text-muted">{p.durStd} min</span>
                     </div>
@@ -147,6 +149,8 @@ function Market({ gameId, state }: ScreenProps) {
                 <div className="flex flex-wrap items-center gap-1.5">
                   <Badge tone={o.special ? 'accent' : 'neutral'}>{KIND_LABEL[o.kind]}</Badge>
                   {o.genre && o.kind !== 'cota' && o.kind !== 'talento' && <GenreChip genre={o.genre} small />}
+                  {o.catalogTitleId && <Badge>título real</Badge>}
+                  {o.lockedBy && <Badge tone="warn">🔒 {lockLabel(o.lockedBy)}</Badge>}
                   <span className="ml-auto text-[11px] text-muted">expira na semana {o.expiresWeek + 1}</span>
                 </div>
                 <div className="font-bold leading-tight">{o.title}</div>
@@ -170,7 +174,9 @@ function Market({ gameId, state }: ScreenProps) {
                   {o.auction && (<><span className="text-muted">Lance mínimo</span><span className="tabular text-right">{moneyEra(era, o.auction.minBid)}</span><span className="text-muted">Seu lance</span><span className="tabular text-right">{o.auction.playerBid ? moneyEra(era, o.auction.playerBid) : '—'}</span></>)}
                 </div>
                 {active && (
-                  o.kind === 'leilao' ? (
+                  o.lockedBy ? (
+                    <p className="rounded border border-border px-3 py-2 text-center text-xs text-muted">Não está à venda: {lockLabel(o.lockedBy)}.</p>
+                  ) : o.kind === 'leilao' ? (
                     <div className="flex gap-2">
                       <input className={inputClass} inputMode="decimal" placeholder="Lance em milhões de R$" value={bid} onChange={(e) => setBid(e.target.value)} />
                       <Button variant="primary" busy={busy} onClick={() => {
