@@ -27,6 +27,7 @@ import { Comercial } from './Comercial.tsx';
 import { Pessoas } from './Pessoas.tsx';
 import { Concorrencia } from './Concorrencia.tsx';
 import { Carreira } from './Carreira.tsx';
+import { Custo } from './Custo.tsx';
 import { HelpContent } from './Ajuda.tsx';
 
 export const NAV: { id: string; label: string; icon: string }[] = [
@@ -39,6 +40,7 @@ export const NAV: { id: string; label: string; icon: string }[] = [
   { id: 'pessoas', label: 'Pessoas', icon: '👥' },
   { id: 'concorrencia', label: 'Concorrência', icon: '📡' },
   { id: 'carreira', label: 'Carreira', icon: '🏆' },
+  { id: 'custo', label: 'Custo da IA', icon: '💵' },
   { id: 'ajuda', label: 'Ajuda', icon: '❓' },
 ];
 
@@ -107,6 +109,7 @@ export function GameShell({ gameId, screen }: { gameId: string; screen: string }
     case 'pessoas': content = <Pessoas {...props} />; break;
     case 'concorrencia': content = <Concorrencia {...props} />; break;
     case 'carreira': content = <Carreira {...props} />; break;
+    case 'custo': content = <Custo {...props} />; break;
     case 'ajuda': content = <div className="p-4 lg:p-6"><HelpContent state={state} /></div>; break;
     default: content = <Boletim {...props} />;
   }

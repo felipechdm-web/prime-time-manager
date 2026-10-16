@@ -28,6 +28,9 @@ export class AnthropicProvider implements LLMProvider {
       messages: req.messages,
       output_config: outputConfig,
     };
+    // Haiku 5.5 aceita desligar o raciocínio com esforço até "high"; nos outros modelos ele fica adaptativo
+    // (o raciocínio é cobrado como saída, então desligá-lo é a maior economia nas cenas curtas)
+    if (req.thinking === false && req.model.includes('haiku')) params.thinking = { type: 'disabled' };
     if (useFallbacks) {
       params.betas = ['server-side-fallback-2026-07-01'];
       params.fallbacks = 'default';
@@ -55,7 +58,7 @@ export class AnthropicProvider implements LLMProvider {
         .map((b: any) => b.text)
         .join('');
       if (resp.stop_reason === 'max_tokens' && !text.trim().endsWith('}')) {
-        return { ok: false, text, usage, model: resp.model ?? req.model, error: 'resposta cortada (max_tokens)' };
+        return { ok: false, text, usage, model: resp.model ?? req.model, error: 'resposta cortada (max_tokens)', truncated: true };
       }
       return { ok: true, text, usage, model: resp.model ?? req.model };
     } catch (err) {

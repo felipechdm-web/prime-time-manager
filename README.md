@@ -49,6 +49,7 @@ Outros comandos (na pasta raiz):
 | `npm run build` | Gera o site em `apps/web/dist`. |
 | `npm run calibrate` | Simula várias temporadas por era e confere as faixas de audiência e receita. |
 | `npm run events-stats` | Frequência e tom dos eventos ao longo de anos simulados. |
+| `npm run custo` | Custo da IA numa semana-padrão de jogo, v1 x v2 (sem chamar a API). |
 | `npm run gen-seed` | Regenera `supabase/seed.sql` e `supabase/setup_completo.sql` a partir dos catálogos. |
 
 ## Estrutura
@@ -72,11 +73,18 @@ prime-time-manager/
 
 - **Dinheiro**: o motor guarda valores em R$ de 2026 e a tela converte pela inflação de cada era, para que os
   valores pareçam da época sem distorcer a matemática entre eras.
-- **Modelos**: cenas e reuniões usam `claude-sonnet-5-5`; tarefas curtas (interpretar ação livre, resumo de
-  campanha) usam `claude-haiku-5-5`. Dá para trocar pelos Secrets `MESTRE_MODEL` e `MESTRE_FAST_MODEL`.
-  O controle de profundidade é o `effort` (`MESTRE_EFFORT`, padrão `low`).
+- **Modelos (v2, seção 17.5)**: todas as funções usam `claude-haiku-5-5` com esforço baixo e raciocínio desligado;
+  cada função tem o seu `max_tokens` (`supabase/functions/_shared/game/llmConfig.ts`). O Sonnet 5.5 fica como
+  modo premium desligado (`LLM_PREMIUM=on` liga, só na avaliação com a presidência). Tudo pode ser trocado por
+  Secrets do Supabase: `LLM_MODEL`, `LLM_EFFORT`, `LLM_THINKING=on` e, por função, `LLM_<FUNCAO>_MODEL`,
+  `LLM_<FUNCAO>_EFFORT` e `LLM_<FUNCAO>_MAX_TOKENS` (ex.: `LLM_REUNIAO_MAX_TOKENS`). Resposta cortada no limite
+  ganha uma nova tentativa com o dobro e fica marcada em `llm_calls.truncated`.
+- **Sem IA onde não precisa**: boletim diário, e-mails de rotina e eventos leves usam textos-modelo do motor; o
+  desfecho de evento escrito pela IA fica só para os graves.
 - **Custos sob controle**: no máximo 30 chamadas ao Mestre por semana de jogo e 60 por hora
-  (`LLM_WEEKLY_CAP`, `LLM_HOURLY_CAP`); cada chamada fica registrada em `llm_calls`.
+  (`LLM_WEEKLY_CAP`, `LLM_HOURLY_CAP`). Cada chamada fica em `llm_calls` com tokens (inclusive escrita e leitura do
+  cache), semana de jogo e custo estimado, e aparece na tela **Custo da IA** do jogo. `npm run custo` compara a
+  v1 com a v2 numa semana-padrão sem gastar nada (resultado de 16/10/2026: US$ 0,17 → US$ 0,006 por semana, 96% menos).
 - **Login**: e-mail e senha ou link mágico. `ALLOWED_EMAILS` restringe quem joga; depois de criar a sua conta,
   desligue novos cadastros no Supabase (passo 3 do tutorial).
 - **Funções com `verify_jwt = false`**: o token do jogador é conferido dentro de cada função

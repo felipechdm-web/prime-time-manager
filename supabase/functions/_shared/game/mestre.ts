@@ -11,7 +11,9 @@ import { getProgram, npcById, playerStation, rivals } from '../engine/state.ts';
 import type { GameState, Npc } from '../engine/types.ts';
 import { formatDateLong } from '../engine/time.ts';
 import { ALLOWED_ACTIONS, ALLOWED_PROPOSAL_TAGS, MESTRE_JSON_SCHEMA, MESTRE_V1_FIXED, mestreContext, mestreUserMessage } from './prompt.ts';
-import type { HandlerCtx, MestreOutput } from './types.ts';
+import type { HandlerCtx, LLMRequest, LLMResponse, MestreOutput } from './types.ts';
+import { callCost } from './llmConfig.ts';
+import type { LLMFunction } from './llmConfig.ts';
 import { parseJsonLoose } from './validators.ts';
 
 const BACKGROUND_LABEL: Record<string, string> = {
@@ -31,9 +33,7 @@ export interface SceneRequest {
   task: string;
   history: string;
   fallback: () => MestreOutput;
-  fn: string; // nome lógico para auditoria em llm_calls
-  maxTokens?: number;
-  fast?: boolean;
+  fn: LLMFunction; // define modelo, esforço e max_tokens (llmConfig.ts) e o nome gravado em llm_calls
 }
 
 export interface SceneResult {
@@ -307,7 +307,7 @@ export function parseAction(out: MestreOutput): SceneResult['pendingAction'] {
   return { type: a.type, params, summary: a.summary || a.type };
 }
 
-async function budgetOk(ctx: HandlerCtx, state: GameState): Promise<string | null> {
+export async function budgetOk(ctx: HandlerCtx, state: GameState): Promise<string | null> {
   if (state.llm.weekIndex !== state.meta.weekIndex) state.llm = { weekCalls: 0, weekIndex: state.meta.weekIndex };
   if (state.llm.weekCalls >= ctx.env.weeklyCap) return `limite de ${ctx.env.weeklyCap} chamadas do Mestre nesta semana de jogo`;
   try {
@@ -320,15 +320,42 @@ async function budgetOk(ctx: HandlerCtx, state: GameState): Promise<string | nul
   return null;
 }
 
-async function logCall(ctx: HandlerCtx, gameId: string, fn: string, model: string, usage: { input: number; output: number; cacheRead: number }, ok: boolean, error?: string) {
+async function logCall(ctx: HandlerCtx, state: GameState, gameId: string, fn: LLMFunction, req: LLMRequest, res: LLMResponse) {
+  const model = res.model || req.model;
+  const base = {
+    game_id: gameId, user_id: ctx.userId, function: fn, model, input_tokens: res.usage.input, output_tokens: res.usage.output,
+    cache_read_tokens: res.usage.cacheRead, ok: res.ok, error: res.error ? res.error.slice(0, 300) : null, created_at: ctx.now().toISOString(),
+  };
+  const v2 = {
+    cache_write_tokens: res.usage.cacheWrite, week_index: state.meta.weekIndex, effort: req.effort ?? null, max_tokens: req.maxTokens,
+    thinking: req.thinking !== false, truncated: !!res.truncated, cost_usd: callCost(model, res.usage),
+  };
   try {
-    await ctx.store.insert('llm_calls', [{
-      game_id: gameId, user_id: ctx.userId, function: fn, model, input_tokens: usage.input, output_tokens: usage.output,
-      cache_read_tokens: usage.cacheRead, ok, error: error ? error.slice(0, 300) : null, created_at: ctx.now().toISOString(),
-    }]);
+    await ctx.store.insert('llm_calls', [{ ...base, ...v2 }]);
   } catch {
-    // auditoria não pode derrubar o jogo
+    // banco ainda sem as colunas da v2 (migração não aplicada): grava ao menos o formato da v1
+    try {
+      await ctx.store.insert('llm_calls', [base]);
+    } catch {
+      // auditoria não pode derrubar o jogo
+    }
   }
+}
+
+// Única porta de saída para a Claude API: aplica a configuração da função, conta na cota da semana e registra o custo.
+export async function callLLM(
+  ctx: HandlerCtx,
+  state: GameState,
+  gameId: string,
+  fn: LLMFunction,
+  req: Pick<LLMRequest, 'system' | 'messages' | 'jsonSchema'> & { maxTokens?: number },
+): Promise<LLMResponse> {
+  const cfg = ctx.env.llm.fns[fn];
+  const full: LLMRequest = { ...req, model: cfg.model, effort: cfg.effort, thinking: cfg.thinking, maxTokens: req.maxTokens ?? cfg.maxTokens };
+  const res = await ctx.llm!.complete(full);
+  state.llm.weekCalls += 1;
+  await logCall(ctx, state, gameId, fn, full, res);
+  return res;
 }
 
 export async function runScene(ctx: HandlerCtx, req: SceneRequest): Promise<SceneResult> {
@@ -344,17 +371,17 @@ export async function runScene(ctx: HandlerCtx, req: SceneRequest): Promise<Scen
   const system = [{ text: MESTRE_V1_FIXED, cache: true }, { text: contextBlock(req.state) }];
   const sheets = await npcSheets(ctx, req.state, req.gameId, req.npcIds);
   const user = mestreUserMessage({ payload: req.payload, npcSheets: sheets, history: req.history, task: req.task });
-  const model = req.fast ? ctx.env.fastModel : ctx.env.sceneModel;
   const messages: { role: 'user' | 'assistant'; content: string }[] = [{ role: 'user', content: user }];
   let output: MestreOutput | null = null;
   let lastError = '';
+  let maxTokens = ctx.env.llm.fns[req.fn].maxTokens;
   for (let attempt = 0; attempt < 2 && !output; attempt++) {
-    const res = await ctx.llm.complete({ system, messages, model, maxTokens: req.maxTokens ?? 3000, jsonSchema: MESTRE_JSON_SCHEMA, effort: ctx.env.effort });
-    req.state.llm.weekCalls += 1;
-    await logCall(ctx, req.gameId, req.fn, res.model || model, res.usage, res.ok, res.error);
+    const res = await callLLM(ctx, req.state, req.gameId, req.fn, { system, messages, jsonSchema: MESTRE_JSON_SCHEMA, maxTokens });
     if (!res.ok) {
       lastError = res.error ?? 'falha na chamada';
       if (res.refusal) break;
+      // resposta cortada: uma nova tentativa com o dobro do limite (fica registrada em llm_calls.truncated)
+      if (res.truncated) maxTokens *= 2;
       continue;
     }
     const parsed = parseJsonLoose(res.text);

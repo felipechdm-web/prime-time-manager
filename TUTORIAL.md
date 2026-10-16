@@ -45,7 +45,9 @@ guarda o código, publica as funções no Supabase e hospeda o site (GitHub Page
    - `ANTHROPIC_API_KEY` = sua chave (`sk-ant-...`)
    - (recomendado) `ALLOWED_EMAILS` = seu e-mail — só ele poderá jogar.
    - (opcional) `LLM_WEEKLY_CAP` = `30` (chamadas do Mestre por semana de jogo) e `LLM_HOURLY_CAP` = `60`.
-   - (opcional) `MESTRE_MODEL` = `claude-sonnet-5-5` e `MESTRE_FAST_MODEL` = `claude-haiku-5-5`.
+   - (opcional) `LLM_PREMIUM` = `on` para usar o Sonnet 5.5 (mais caro) na avaliação com a presidência.
+     Sem ele, tudo roda no Haiku 5.5, o modelo mais barato. Os outros ajustes estão no README.
+   - Se você criou `MESTRE_MODEL` ou `MESTRE_FAST_MODEL` antes, pode apagar: a versão atual não lê mais esses segredos.
 3. **Nunca** coloque a chave no GitHub nem no site. As outras variáveis das funções
    (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`) o próprio Supabase já fornece.
 4. No Claude Console (platform.claude.com) → *Billing*: carregue créditos (ex.: US$ 20), deixe a **recarga automática
@@ -104,8 +106,10 @@ guarda o código, publica as funções no Supabase e hospeda o site (GitHub Page
 | "Este e-mail não está autorizado" | Confira `ALLOWED_EMAILS` (o mesmo e-mail da conta do jogo). |
 
 ## Conferir custos
-Tabela `llm_calls` no Supabase (tokens por chamada) e a tela *Usage* do Claude Console.
+No jogo, menu **Custo da IA** (no celular, em *Mais*): gasto por função e por semana de jogo. O valor cobrado de
+fato está na tela *Usage* do Claude Console; a tabela `llm_calls` do Supabase guarda cada chamada.
 
 ## Atualizar o jogo depois
-Qualquer alteração enviada para a `main` (pelo GitHub Desktop: *Commit* → *Push origin*) roda o **Deploy** de novo.
-Se o arquivo `supabase/setup_completo.sql` mudar, cole-o outra vez no SQL Editor (passo 2): ele preserva as partidas.
+1. Se o arquivo `supabase/setup_completo.sql` mudou, **primeiro** cole-o outra vez no SQL Editor (passo 2).
+   Ele preserva as partidas e só acrescenta o que falta (na v2: as colunas de custo em `llm_calls`).
+2. Depois envie as alterações para a `main` (pelo GitHub Desktop: *Commit* → *Push origin*). Isso roda o **Deploy** de novo.

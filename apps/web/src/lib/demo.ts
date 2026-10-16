@@ -4,6 +4,7 @@
 import {
   applyIntentHandler, createGame, interpretHandler, liveModeHandler, mestreSceneHandler, resolveEventHandler, simulateHandler,
 } from '@game/handlers.ts';
+import { resolveLLMConfig } from '@game/llmConfig.ts';
 import { MemoryStore } from '@game/memoryStore.ts';
 import type { GameRow, HandlerCtx, SelectOpts } from '@game/types.ts';
 import { HttpError } from '@game/types.ts';
@@ -52,7 +53,7 @@ export async function createDemoBackend(): Promise<Backend> {
     llm: null,
     userId: USER.id,
     validateMestre: validateMestrePlain,
-    env: { sceneModel: 'claude-sonnet-5-5', fastModel: 'claude-haiku-5-5', weeklyCap: 30, hourlyCap: 60, effort: 'low' },
+    env: { llm: resolveLLMConfig(), weeklyCap: 30, hourlyCap: 60 },
     now: () => new Date(),
     uuid,
   });

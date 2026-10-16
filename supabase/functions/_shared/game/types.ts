@@ -1,6 +1,7 @@
 // Tipos da camada de jogo (handlers), compartilhada entre Edge Functions (Deno) e o modo demo (navegador).
 
 import type { GameState } from '../engine/types.ts';
+import type { LLMConfig } from './llmConfig.ts';
 
 export interface GameRow {
   id: string;
@@ -56,6 +57,7 @@ export interface LLMRequest {
   maxTokens: number;
   jsonSchema?: Record<string, unknown>;
   effort?: 'low' | 'medium' | 'high';
+  thinking?: boolean; // false desliga o raciocínio onde o modelo permite (Haiku 5.5 com esforço até "high")
 }
 
 export interface LLMResponse {
@@ -65,6 +67,7 @@ export interface LLMResponse {
   model: string;
   error?: string;
   refusal?: boolean;
+  truncated?: boolean; // parou em max_tokens
 }
 
 // Interface do provedor (seção 19.5): trocar de provedor não muda o resto do código
@@ -91,11 +94,9 @@ export interface MestreOutput {
 export type Validator = (obj: unknown) => { ok: true; value: MestreOutput } | { ok: false; error: string };
 
 export interface HandlerEnv {
-  sceneModel: string;
-  fastModel: string;
+  llm: LLMConfig; // modelo, esforço e max_tokens por função (llmConfig.ts)
   weeklyCap: number;
   hourlyCap: number;
-  effort: 'low' | 'medium' | 'high';
 }
 
 export interface HandlerCtx {

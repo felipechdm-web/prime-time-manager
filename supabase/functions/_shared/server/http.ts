@@ -3,6 +3,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.117.2';
 import { HttpError } from '../game/types.ts';
 import type { HandlerCtx } from '../game/types.ts';
+import { resolveLLMConfig } from '../game/llmConfig.ts';
 import { AnthropicProvider } from './anthropic.ts';
 import { SupabaseStore } from './supabaseStore.ts';
 import { validateMestreZod } from './zod.ts';
@@ -46,18 +47,16 @@ export function serve(handler: Handler): void {
         throw new HttpError(400, 'Corpo JSON inválido');
       }
       const apiKey = env('ANTHROPIC_API_KEY');
-      const effort = env('MESTRE_EFFORT', 'low');
       const ctx: HandlerCtx = {
         store: new SupabaseStore(admin),
         llm: apiKey ? new AnthropicProvider(apiKey) : null,
         userId: user.id,
         validateMestre: validateMestreZod,
         env: {
-          sceneModel: env('MESTRE_MODEL', 'claude-sonnet-5-5'),
-          fastModel: env('MESTRE_FAST_MODEL', 'claude-haiku-5-5'),
+          // v2: Haiku 5.5 em todas as funções; MESTRE_MODEL/MESTRE_FAST_MODEL da v1 não são mais lidos
+          llm: resolveLLMConfig((name) => Deno.env.get(name)),
           weeklyCap: parseInt(env('LLM_WEEKLY_CAP', '30'), 10) || 30,
           hourlyCap: parseInt(env('LLM_HOURLY_CAP', '60'), 10) || 60,
-          effort: (['low', 'medium', 'high'].includes(effort) ? effort : 'low') as 'low' | 'medium' | 'high',
         },
         now: () => new Date(),
         uuid: () => crypto.randomUUID(),

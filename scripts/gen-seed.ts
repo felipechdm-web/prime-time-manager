@@ -4,7 +4,7 @@
 //   prompts/mestre.v1.md         -> system prompt do Mestre, versão legível
 // Uso: node scripts/gen-seed.ts
 
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { readdirSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { ERAS, ERA_RULES } from '../supabase/functions/_shared/engine/catalog/eras.ts';
 import { GENRES } from '../supabase/functions/_shared/engine/catalog/genres.ts';
 import { EVENT_TEMPLATES } from '../supabase/functions/_shared/engine/catalog/events.ts';
@@ -50,7 +50,12 @@ lines.push('commit;');
 const seed = lines.join('\n') + '\n';
 writeFileSync('supabase/seed.sql', seed, 'utf8');
 
-const migration = readFileSync('supabase/migrations/20261015000000_init.sql', 'utf8');
+// todas as migrações, em ordem (a da v2 só acrescenta colunas)
+const migration = readdirSync('supabase/migrations')
+  .filter((f) => f.endsWith('.sql'))
+  .sort()
+  .map((f) => readFileSync(`supabase/migrations/${f}`, 'utf8'))
+  .join('\n\n');
 writeFileSync(
   'supabase/setup_completo.sql',
   `-- Prime Time Manager — instalação completa (migração + catálogo).\n-- Cole este arquivo inteiro no SQL Editor do Supabase e clique em "Run".\n-- Pode ser executado de novo sem problemas (atualiza o catálogo).\n\n${migration}\n\n${seed}`,

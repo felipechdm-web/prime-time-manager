@@ -9,6 +9,7 @@ import {
 import { validateMestrePlain } from '../supabase/functions/_shared/game/validators.ts';
 import { allowedNumbers, scrubNumbers } from '../supabase/functions/_shared/game/mestre.ts';
 import type { HandlerCtx, LLMProvider, LLMRequest } from '../supabase/functions/_shared/game/types.ts';
+import { resolveLLMConfig, summarizeLLMCalls } from '../supabase/functions/_shared/game/llmConfig.ts';
 import type { GameState } from '../supabase/functions/_shared/engine/types.ts';
 
 let counter = 0;
@@ -18,7 +19,7 @@ function ctxWith(store: MemoryStore, llm: LLMProvider | null, userId = 'user-a')
     llm,
     userId,
     validateMestre: validateMestrePlain,
-    env: { sceneModel: 'claude-sonnet-5-5', fastModel: 'claude-haiku-5-5', weeklyCap: 30, hourlyCap: 60, effort: 'low' },
+    env: { llm: resolveLLMConfig(), weeklyCap: 30, hourlyCap: 60 },
     now: () => new Date(),
     uuid: () => `00000000-0000-4000-8000-${String(++counter).padStart(12, '0')}`,
   };
@@ -167,6 +168,130 @@ test('Mestre com LLM falso: valida JSON, corta números inventados e filtra prop
   assert.equal(mem[0].weight, 5);
   const logs = await store.select('llm_calls', { game_id: gameId });
   assert.equal(logs.length, 2);
+});
+
+// ===== Fase 6.1: custo da IA =====
+
+const SCENE_JSON = JSON.stringify({
+  scene_type: 'livre', narrative: [{ speaker: 'narrador', text: 'O corredor ferve.' }], headlines: [],
+  choices: [{ id: 'ok', label: 'Ok' }], player_action: null, proposals: [], memory_notes: [],
+});
+
+function recordingLLM(script: ((req: LLMRequest) => { truncated?: boolean } | void)[] = []) {
+  const calls: LLMRequest[] = [];
+  const provider: LLMProvider = {
+    name: 'gravador',
+    async complete(req: LLMRequest) {
+      calls.push(req);
+      const plan = script[calls.length - 1]?.(req);
+      const usage = { input: 1000, output: 200, cacheRead: 0, cacheWrite: 1600 };
+      if (plan?.truncated) return { ok: false, text: '{"scene', usage, model: req.model, error: 'resposta cortada (max_tokens)', truncated: true };
+      return { ok: true, text: SCENE_JSON, usage, model: req.model };
+    },
+  };
+  return { provider, calls };
+}
+
+test('configuração padrão da v2: Haiku, esforço baixo, sem raciocínio e max_tokens da seção 17.5', () => {
+  const cfg = resolveLLMConfig();
+  for (const fn of Object.values(cfg.fns)) {
+    assert.equal(fn.model, 'claude-haiku-5-5');
+    assert.equal(fn.effort, 'low');
+    assert.equal(fn.thinking, false);
+  }
+  assert.equal(cfg.fns.boletim.maxTokens, 1200);
+  assert.equal(cfg.fns.reuniao.maxTokens, 600);
+  assert.equal(cfg.fns.evento.maxTokens, 700);
+  assert.equal(cfg.fns['live-mode'].maxTokens, 500);
+  assert.equal(cfg.fns['interpret-free-action'].maxTokens, 300);
+  assert.equal(cfg.fns.avaliacao.maxTokens, 1500);
+  assert.equal(cfg.premium, false);
+  // modo premium liga o Sonnet só na avaliação; variáveis por função sobrescrevem o padrão
+  const env: Record<string, string> = { LLM_PREMIUM: 'on', LLM_REUNIAO_MAX_TOKENS: '900', LLM_BIA_EFFORT: 'medium' };
+  const p = resolveLLMConfig((k) => env[k]);
+  assert.equal(p.fns.avaliacao.model, 'claude-sonnet-5-5');
+  assert.equal(p.fns.boletim.model, 'claude-haiku-5-5');
+  assert.equal(p.fns.reuniao.maxTokens, 900);
+  assert.equal(p.fns.bia.effort, 'medium');
+});
+
+test('boletim diário, e-mails e grade não chamam a IA; eventos leves usam texto-modelo', async () => {
+  const store = new MemoryStore();
+  const { provider, calls } = recordingLLM();
+  const ctx = ctxWith(store, provider);
+  const { gameId } = await createGame(ctx, { ...NEW, seed: 4242 });
+  assert.equal(calls.length, 1, 'só a entrevista inicial');
+  await applyIntentHandler(ctx, { gameId, intent: { type: 'fill_empty' } });
+  await simulateHandler(ctx, { gameId, mode: 'day' });
+  await simulateHandler(ctx, { gameId, mode: 'week' });
+  assert.equal(calls.length, 1, 'simular dias e a semana não chama a IA (boletim diário e e-mails são textos do motor)');
+
+  const { fireEvent } = await import('../supabase/functions/_shared/engine/eventsEngine.ts');
+  const { EVENT_TEMPLATES } = await import('../supabase/functions/_shared/engine/catalog/events.ts');
+  let state = await gameState(store, gameId);
+  const leve = fireEvent(state, EVENT_TEMPLATES.find((t) => t.severity === 'leve' && t.options.length > 1)!.id, {})!;
+  const medio = fireEvent(state, EVENT_TEMPLATES.find((t) => t.severity === 'medio' && t.options.length > 1)!.id, {})!;
+  await store.updateGame(gameId, { state }, (await store.getGame(gameId))!.version);
+
+  await mestreSceneHandler(ctx, { gameId, action: 'narrate_event', eventId: leve.id });
+  assert.equal(calls.length, 1, 'evento leve não chama a IA');
+  await mestreSceneHandler(ctx, { gameId, action: 'narrate_event', eventId: medio.id });
+  assert.equal(calls.length, 2, 'evento médio é narrado');
+  const req = calls[1];
+  assert.equal(req.model, 'claude-haiku-5-5');
+  assert.equal(req.effort, 'low');
+  assert.equal(req.maxTokens, 700);
+  assert.equal(req.thinking, false);
+  assert.ok(req.system[0].cache, 'parte fixa do Mestre vai com cache');
+
+  state = await gameState(store, gameId);
+  const ev = state.events.find((e) => e.id === medio.id)!;
+  await resolveEventHandler(ctx, { gameId, eventId: ev.id, optionId: ev.options[0].id });
+  assert.equal(calls.length, 2, 'desfecho com IA só em evento grave');
+
+  const logs = await store.select('llm_calls', { game_id: gameId, function: 'evento' });
+  assert.equal(logs.length, 1);
+  assert.equal(logs[0].cache_write_tokens, 1600);
+  assert.equal(logs[0].week_index, state.meta.weekIndex);
+  assert.equal(logs[0].truncated, false);
+  // 1000 × 0,10 + 200 × 0,50 + 1600 × 0,125 (por milhão)
+  assert.ok(Math.abs(Number(logs[0].cost_usd) - 0.0004) < 1e-9);
+});
+
+test('painel de custo: linhas reais da v1 (sem custo gravado) e da v2', () => {
+  const rows = [
+    // as duas chamadas da v1 do Felipe (llm_calls, 16/10/2026)
+    { function: 'live-mode', model: 'claude-sonnet-5-5', input_tokens: 2123, output_tokens: 855, cache_read_tokens: 0, ok: true },
+    { function: 'create-game', model: 'claude-sonnet-5-5', input_tokens: 1551, output_tokens: 890, cache_read_tokens: 0, ok: true },
+    // v2: custo e semana gravados
+    { function: 'boletim', model: 'claude-haiku-5-5', input_tokens: 900, output_tokens: 300, cache_read_tokens: 3700, cache_write_tokens: 0, cost_usd: 0.000277, week_index: 1, ok: true, truncated: false },
+    { function: 'reuniao', model: 'claude-haiku-5-5', input_tokens: 800, output_tokens: 600, cache_read_tokens: 0, cache_write_tokens: 3700, cost_usd: 0.000843, week_index: 1, ok: false, truncated: true },
+  ];
+  const s = summarizeLLMCalls(rows);
+  assert.equal(s.total.calls, 4);
+  const live = s.byFunction.find((f) => f.fn === 'live-mode')!;
+  const cg = s.byFunction.find((f) => f.fn === 'create-game')!;
+  assert.equal(live.agg.usd.toFixed(4), '0.0128', 'mesmo valor do relatório da v1');
+  assert.equal(cg.agg.usd.toFixed(4), '0.0120');
+  assert.equal(s.byFunction[0].fn, 'live-mode', 'mais caro primeiro');
+  assert.deepEqual(s.byWeek.map((w) => w.week), [1, null]);
+  assert.ok(Math.abs(s.perWeek! - 0.00112) < 1e-9);
+  assert.equal(s.cacheHit, 0.5);
+  assert.equal(s.total.failed, 1);
+  assert.equal(s.total.truncated, 1);
+});
+
+test('resposta cortada em max_tokens tenta de novo com o dobro do limite', async () => {
+  const store = new MemoryStore();
+  const { provider, calls } = recordingLLM([() => ({ truncated: true })]);
+  const ctx = ctxWith(store, provider);
+  const { gameId, interview } = await createGame(ctx, { ...NEW, seed: 777 });
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0].maxTokens, 700);
+  assert.equal(calls[1].maxTokens, 1400);
+  assert.equal(interview.narrative[0].text, 'O corredor ferve.');
+  const logs = await store.select('llm_calls', { game_id: gameId });
+  assert.deepEqual(logs.map((l) => l.truncated), [true, false]);
 });
 
 test('checagem de números aceita os do payload e corta os inventados', () => {

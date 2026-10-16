@@ -24,6 +24,9 @@ jobs:
       - name: Testes do motor e das funções (sem IA)
         run: node --test tests/engine.test.ts tests/handlers.test.ts
 
+      - name: Custo da IA por semana de jogo (v1 x v2, meta de 80% menos)
+        run: node scripts/custo-semana.ts
+
       - name: Instalar dependências do site
         working-directory: apps/web
         run: npm ci
