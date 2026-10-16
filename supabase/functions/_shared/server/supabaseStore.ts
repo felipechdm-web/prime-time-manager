@@ -46,6 +46,14 @@ export class SupabaseStore implements GameStore {
     return (data as unknown as Record<string, unknown>[]) ?? [];
   }
 
+  async upsert(table: string, rows: Record<string, unknown>[], onConflict: string[]): Promise<void> {
+    for (let i = 0; i < rows.length; i += 200) {
+      // defaultToNull: false -> coluna ausente usa o padrão na inserção e não é sobrescrita na atualização
+      const { error } = await this.db.from(table).upsert(rows.slice(i, i + 200), { onConflict: onConflict.join(','), defaultToNull: false });
+      if (error) throw new Error(`${table} upsert: ${error.message}`);
+    }
+  }
+
   async update(table: string, eq: Record<string, unknown>, patch: Record<string, unknown>): Promise<void> {
     let q = this.db.from(table).update(patch);
     for (const [k, v] of Object.entries(eq)) q = q.eq(k, v as string);

@@ -87,6 +87,20 @@ export class MemoryStore implements GameStore {
     return structuredClone(rows);
   }
 
+  async upsert(table: string, rows: Row[], onConflict: string[]): Promise<void> {
+    const arr = this.t(table);
+    for (const r of rows) {
+      const hit = onConflict.every((k) => r[k] !== undefined && r[k] !== null) ? arr.find((x) => onConflict.every((k) => x[k] === r[k])) : undefined;
+      if (hit) Object.assign(hit, structuredClone(r));
+      else {
+        const copy = structuredClone(r);
+        if (copy.id === undefined || copy.id === null) copy.id = this.nextId(table);
+        arr.push(copy);
+      }
+    }
+    this.dirty.add(table);
+  }
+
   async update(table: string, eq: Record<string, unknown>, patch: Row): Promise<void> {
     for (const r of this.t(table)) if (this.match(r, eq, {})) Object.assign(r, structuredClone(patch));
     this.dirty.add(table);

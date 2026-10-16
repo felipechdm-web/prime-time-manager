@@ -22,7 +22,7 @@ jobs:
           cache-dependency-path: apps/web/package-lock.json
 
       - name: Testes do motor e das funções (sem IA)
-        run: node --test tests/engine.test.ts tests/handlers.test.ts
+        run: node --test tests/engine.test.ts tests/handlers.test.ts tests/catalog.test.ts
 
       - name: Custo da IA por semana de jogo (v1 x v2, meta de 80% menos)
         run: node scripts/custo-semana.ts

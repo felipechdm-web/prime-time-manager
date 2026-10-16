@@ -38,6 +38,8 @@ export interface GameStore {
   updateGame(id: string, patch: Partial<GameRow>, expectedVersion: number): Promise<boolean>;
   insert(table: string, rows: Record<string, unknown>[]): Promise<Record<string, unknown>[]>;
   select(table: string, eq: Record<string, unknown>, opts?: SelectOpts): Promise<Record<string, unknown>[]>;
+  // insere ou atualiza pela chave (todas as linhas com as mesmas colunas; colunas ausentes ficam como estão)
+  upsert(table: string, rows: Record<string, unknown>[], onConflict: string[]): Promise<void>;
   update(table: string, eq: Record<string, unknown>, patch: Record<string, unknown>): Promise<void>;
   remove(table: string, eq: Record<string, unknown>, lt?: Record<string, number>): Promise<void>;
   countSince(table: string, eq: Record<string, unknown>, column: string, sinceIso: string): Promise<number>;
@@ -97,6 +99,7 @@ export interface HandlerEnv {
   llm: LLMConfig; // modelo, esforço e max_tokens por função (llmConfig.ts)
   weeklyCap: number;
   hourlyCap: number;
+  catalogAdmin?: boolean; // e-mail do jogador está em ALLOWED_EMAILS (pode editar o catálogo)
 }
 
 export interface HandlerCtx {

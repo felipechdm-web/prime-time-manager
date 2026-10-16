@@ -146,6 +146,7 @@ export interface Program {
   tableMult: number; // ajuste de tabela por programa
   price30s: number; // preço de tabela atual (R$ 2026)
   label?: string; // rótulo de grade (concorrentes no modo real)
+  catalogTitleId?: string; // v2: título real de origem (catalog_titles.id), quando veio do catálogo
   synopsis?: string;
   premiereWeek: number | null;
   createdWeek: number;

@@ -24,3 +24,6 @@ verify_jwt = false
 
 [functions.interpret-free-action]
 verify_jwt = false
+
+[functions.catalog-admin]
+verify_jwt = false

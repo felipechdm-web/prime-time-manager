@@ -57,6 +57,8 @@ export function serve(handler: Handler): void {
           llm: resolveLLMConfig((name) => Deno.env.get(name)),
           weeklyCap: parseInt(env('LLM_WEEKLY_CAP', '30'), 10) || 30,
           hourlyCap: parseInt(env('LLM_HOURLY_CAP', '60'), 10) || 60,
+          // Editor de Catálogo: só quem está em ALLOWED_EMAILS (sem a lista, ninguém edita)
+          catalogAdmin: allowed.length > 0 && allowed.includes((user.email ?? '').toLowerCase()),
         },
         now: () => new Date(),
         uuid: () => crypto.randomUUID(),

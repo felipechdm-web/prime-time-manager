@@ -52,6 +52,7 @@ export function Games({ backend, user, onSwitchMode }: { backend: Backend; user:
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="ghost" size="sm" onClick={() => go('ajuda')}>Como jogar</Button>
+          {backend.mode === 'cloud' && <Button variant="ghost" size="sm" onClick={() => go('catalogo')}>Editor de Catálogo</Button>}
           {backend.mode === 'demo' && cloudConfigured() && <Button size="sm" onClick={() => onSwitchMode(false)}>Usar modo nuvem</Button>}
           {backend.mode === 'cloud' && <Button size="sm" variant="ghost" onClick={() => onSwitchMode(true)}>Modo demonstração</Button>}
           {backend.mode === 'cloud' && <Button size="sm" onClick={() => backend.signOut()}>Sair</Button>}

@@ -76,8 +76,9 @@ guarda o código, publica as funções no Supabase e hospeda o site (GitHub Page
      (a publishable/anon key).
 5. **Settings → Pages → Build and deployment → Source: GitHub Actions**.
 6. Vá em **Actions** → workflow **Deploy** → **Run workflow** (ou faça qualquer commit na `main`). Ele tem duas partes:
-   - **Edge Functions (Supabase)**: publica as 7 funções (`create-game`, `apply-intent`, `simulate-week`, `mestre-scene`,
-     `resolve-event`, `live-mode`, `interpret-free-action`) com `--no-verify-jwt` (o login é conferido dentro de cada função);
+   - **Edge Functions (Supabase)**: publica as 8 funções (`create-game`, `apply-intent`, `simulate-week`, `mestre-scene`,
+     `resolve-event`, `live-mode`, `interpret-free-action` e `catalog-admin`, do Editor de Catálogo) com `--no-verify-jwt`
+     (o login é conferido dentro de cada função);
    - **Site (GitHub Pages)**: gera o site e publica em `https://SEU-USUARIO.github.io/prime-time-manager/`.
    O outro workflow, **CI**, roda os testes do jogo a cada envio; ele não publica nada.
 

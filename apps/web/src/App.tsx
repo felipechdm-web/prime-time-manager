@@ -9,6 +9,7 @@ import { Games } from './screens/Games.tsx';
 import { NewGame } from './screens/NewGame.tsx';
 import { GameShell } from './screens/GameShell.tsx';
 import { HelpPage } from './screens/Ajuda.tsx';
+import { CatalogEditor } from './screens/CatalogEditor.tsx';
 
 function readDemoPref(): boolean {
   try {
@@ -77,6 +78,7 @@ export function App() {
   if (!user) page = <Login backend={backend} onDemo={() => switchMode(true)} />;
   else if (root === 'novo') page = <NewGame />;
   else if (root === 'ajuda') page = <HelpPage />;
+  else if (root === 'catalogo') page = <CatalogEditor />;
   else if (root === 'g' && id) page = <GameShell gameId={id} screen={screen ?? 'boletim'} />;
   else page = <Games backend={backend} user={user} onSwitchMode={switchMode} />;
 

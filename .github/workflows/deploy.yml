@@ -42,7 +42,7 @@ jobs:
         with:
           version: latest
 
-      - name: Publicar as 7 funções
+      - name: Publicar as funções
         run: supabase functions deploy --project-ref "$SUPABASE_PROJECT_REF" --no-verify-jwt
 
   site:
