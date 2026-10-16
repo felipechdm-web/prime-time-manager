@@ -1,0 +1,8 @@
+﻿id;era_id;product_ref;holder_station_key;terms;valid_from;valid_to;confidence;approved;notes;batch
+2601;now;televisa;sbt;"{""escopo"":""novelas da TelevisaUnivision"",""exclusividade"":""tv_aberta"",""renovacao"":""preferencial""}";2023-01-01;2028-12-31;media;;"Web: acordo estendido por cinco anos em 2023 (Meio & Mensagem). Datas de início e fim aproximadas; conferir.";2026-lote1
+2602;now;mae_anne;record;"{""exclusividade"":""tv_aberta"",""plataformas"":[""tv_aberta""]}";2025-10-01;;media;;Web: em exibição na Record às 21h desde out/2025. Termos do contrato: estimativa.;2026-lote1
+2603;now;cruel_istambul;band;"{""exclusividade"":""tv_aberta"",""plataformas"":[""tv_aberta""]}";2025-09-08;;media;;Web: a Band comprou os direitos de Zalim İstanbul (Señal News) e estreou em 08/09/2025. Termos: estimativa.;2026-lote1
+2604;now;big_brother;globo;"{""exclusividade"":""formato_brasil"",""plataformas"":[""tv_aberta"",""streaming_proprio""]}";2002-01-01;;alta;;Web: BBB 26 na Globo desde 12/01/2026. Duração do contrato: estimativa.;2026-lote1
+2605;now;masterchef;band;"{""exclusividade"":""formato_brasil""}";2014-01-01;;media;;Memória: MasterChef Brasil na Band desde 2014.;2026-lote1
+2606;now;a_fazenda;record;"{""exclusividade"":""formato_brasil""}";2009-01-01;;media;;Memória: A Fazenda na Record desde 2009.;2026-lote1
+2607;now;novelas_turcas;record;"{""tipo"":""relacionamento"",""descricao"":""as distribuidoras turcas têm relação forte com a Record, mas vendem títulos avulsos a quem pagar""}";;;media;;Documento-mestre, seção 8A.6 (Diário do Grande ABC). Não é contrato: é a relação de mercado que a Fase 6.3 usa no relacionamento inicial.;2026-lote1

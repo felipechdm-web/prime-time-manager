@@ -69,6 +69,22 @@ test('CSV: exportar e importar de volta dá o mesmo conteúdo; erros apontam a l
   assert.ok(csvToCatalogRows('catalog_titles', 'id;kind\nx;filme').headerErrors.some((e) => e.includes('title_br')));
 });
 
+test('lote 1 de 2026: válido pelas regras do Editor, sem aprovação e com fonte em cada item', async () => {
+  const { buildLote1 } = await import('../supabase/seeds/build.ts');
+  const { TITLES, HOLDERS, GRIDS } = await import('../supabase/seeds/catalogo_2026_lote1.ts');
+  const built = buildLote1();
+  assert.deepEqual(built.problems, []);
+  assert.equal(built.counts.titulos, 60);
+  assert.deepEqual(GRIDS.map((g) => g.station_key).sort(), ['band', 'globo', 'record', 'sbt']);
+  for (const x of [...TITLES, ...HOLDERS]) assert.ok(x.notes.length > 10, `${x.id} sem nota de fonte`);
+  // representantes das empresas são sempre fictícios
+  for (const h of HOLDERS) assert.equal((h.representative_seed as { ficticio?: boolean }).ficticio, true);
+  // o CSV gerado volta pela importação do Editor sem erros
+  const back = csvToCatalogRows('catalog_titles', built.csv.catalog_titles!);
+  assert.equal(back.rows.filter((r) => r.errors.length).length, 0);
+  assert.equal(back.rows.length, 60);
+});
+
 test('catalog-admin: só o dono edita; valida antes de gravar; aprova, corrige e apaga', async () => {
   const store = new MemoryStore();
   const admin = ctxWith(store, true);

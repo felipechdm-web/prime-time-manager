@@ -12,6 +12,7 @@
     "events-stats": "node scripts/events-stats.ts",
     "custo": "node scripts/custo-semana.ts",
     "gen-seed": "node scripts/gen-seed.ts",
+    "gen-catalog": "node scripts/gen-catalog-seed.ts",
     "web:install": "npm --prefix apps/web ci",
     "dev": "npm --prefix apps/web run dev",
     "build": "npm --prefix apps/web run build",
