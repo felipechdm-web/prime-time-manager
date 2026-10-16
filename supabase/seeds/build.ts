@@ -32,6 +32,44 @@ function insertSql(table: CatalogTable, rows: Record<string, unknown>[], conflic
   return `insert into public.${table} (${cols.join(', ')}) values\n${values}\non conflict ${conflict} do nothing;\n`;
 }
 
+const CATALOG_GUARD = `-- confere se a migração do catálogo já foi aplicada (senão, para com uma explicação)
+do $$
+begin
+  if to_regclass('public.rights_holders') is null then
+    raise exception 'O catálogo ainda não existe neste banco. Cole e rode PRIMEIRO o arquivo supabase/setup_completo.sql da pasta Documentos\\GitHub\\prime-time-manager (passo 1 da Fase 6.2) e depois rode este arquivo de novo.';
+  end if;
+end $$;`;
+
+// Correção de uma grade já carregada: troca a grade pendente (não aprovada) da emissora pela versão atual do lote.
+// Grades já aprovadas no Editor não são tocadas.
+export function buildGridFix(stationKey: string): { problems: string[]; sql: string } {
+  const g = GRIDS.find((x) => x.station_key === stationKey);
+  if (!g) return { problems: [`grade "${stationKey}" não existe no lote`], sql: '' };
+  const built = buildLote1();
+  const row = normalizeCatalogRow('schedule_templates', { era_id: ERA, station_key: g.station_key, reference_month: g.reference_month ?? REFERENCE_MONTH, slots: g.slots, confidence: g.confidence, notes: g.notes, batch: BATCH });
+  const problems = [...built.problems, ...row.errors];
+  const cols = Object.keys(row.row);
+  const sql = `-- Prime Time Manager — correção da grade "${stationKey}" do ${BATCH}.
+-- Gerado por scripts/gen-catalog-seed.ts. Cole no SQL Editor do Supabase e clique em Run.
+-- Apaga a grade pendente (não aprovada) desta emissora e grava a versão corrigida, também pendente:
+-- aprove no Editor de Catálogo depois de conferir. Grades já aprovadas não são alteradas.
+
+${CATALOG_GUARD}
+
+begin;
+
+delete from public.schedule_templates
+where era_id = '${ERA}' and station_key = ${q(stationKey)} and approved = false;
+
+insert into public.schedule_templates (${cols.join(', ')}) values
+  (${cols.map((c) => q(row.row[c])).join(', ')})
+on conflict (era_id, station_key, reference_month) do nothing;
+
+commit;
+`;
+  return { problems, sql };
+}
+
 export function buildLote1(): BuiltSeed {
   const problems: string[] = [];
   const check = (table: CatalogTable, label: string, raw: Record<string, unknown>) => {
@@ -56,7 +94,7 @@ export function buildLote1(): BuiltSeed {
       if (sl.catalog_title_id && !titleIds.has(sl.catalog_title_id)) problems.push(`grade ${g.station_key} faixa ${i + 1}: título "${sl.catalog_title_id}" não está no lote`);
       if (!/^\d{2}:\d{2}$/.test(sl.inicio) || !/^\d{2}:\d{2}$/.test(sl.fim)) problems.push(`grade ${g.station_key} faixa ${i + 1}: horário inválido`);
     });
-    return check('schedule_templates', g.station_key, { era_id: ERA, station_key: g.station_key, reference_month: REFERENCE_MONTH, slots: g.slots, confidence: g.confidence, notes: g.notes, batch: BATCH });
+    return check('schedule_templates', g.station_key, { era_id: ERA, station_key: g.station_key, reference_month: g.reference_month ?? REFERENCE_MONTH, slots: g.slots, confidence: g.confidence, notes: g.notes, batch: BATCH });
   });
   const known = new Set([...titleIds, ...holderIds, 'novelas_turcas']);
   const rights = RIGHTS.map((r) => {
@@ -73,13 +111,7 @@ export function buildLote1(): BuiltSeed {
 -- revise e aprove no Editor de Catálogo. Rodar de novo não apaga nem desfaz correções feitas no Editor.
 -- Atributos de jogo são estimativas, nunca audiência oficial. Representantes das empresas são fictícios.
 
--- confere se a migração do catálogo já foi aplicada (senão, para com uma explicação)
-do $$
-begin
-  if to_regclass('public.rights_holders') is null then
-    raise exception 'O catálogo ainda não existe neste banco. Cole e rode PRIMEIRO o arquivo supabase/setup_completo.sql da pasta Documentos\\GitHub\\prime-time-manager (passo 1 da Fase 6.2) e depois rode este arquivo de novo.';
-  end if;
-end $$;
+${CATALOG_GUARD}
 
 begin;
 
