@@ -297,7 +297,7 @@ export const EVENT_TEMPLATES: EventTemplate[] = [
   {
     id: 'vazamento_capitulo', category: 'bastidor', title: 'Vazamento de capítulo', severity: 'leve', tone: 'neutro',
     subject: 'program', trigger: [['program.isNovela', 'true'], ['program.epsLeft', 'gte', 10]],
-    baseProb: 0.05, eras: ['00s', '10s', 'now'], universe: U, speaker: 'npc_artistico', cooldownWeeks: 20,
+    baseProb: 0.05, eras: U, universe: U, speaker: 'npc_artistico', cooldownWeeks: 20,
     scene: 'O capítulo da semana que vem de {program} vazou na internet. Lúcia quer achar o culpado; Rodrigo acha que é publicidade de graça.',
     options: [
       { id: 'investigar', label: 'Abrir investigação interna', effects: { npc: [{ target: 'artistico', mood: 6 }], cashWeeks: -0.01 } },
@@ -471,7 +471,7 @@ export const EVENT_TEMPLATES: EventTemplate[] = [
   {
     id: 'formato_internacional', category: 'mercado', title: 'Formato internacional disputado', severity: 'leve', tone: 'positivo',
     subject: 'none', trigger: [],
-    baseProb: 0.05, eras: ['90s', '00s', '10s', 'now'], universe: U, speaker: 'npc_artistico', cooldownWeeks: 20,
+    baseProb: 0.05, eras: U, universe: U, speaker: 'npc_artistico', cooldownWeeks: 20,
     scene: 'Uma distribuidora europeia tem um formato que foi sucesso em 30 países. Duas emissoras já demonstraram interesse.',
     options: [
       { id: 'ver', label: 'Ver a oferta no mercado', effects: { addOffer: 'formato' } },
@@ -603,182 +603,11 @@ export const EVENT_TEMPLATES: EventTemplate[] = [
     ],
     defaultOption: 'neutro',
   },
-  // ======================= ERA: ANOS 80 =======================
-  {
-    id: 'plano_economico', category: 'era', title: 'Plano econômico congela preços', severity: 'grave', tone: 'negativo',
-    subject: 'none', trigger: [['game.yearIn', 'in', [1986, 1987, 1989, 1990, 1991]]],
-    baseProb: 0.06, eras: ['80s', '90s'], universe: U, speaker: 'npc_comercial', cooldownWeeks: 52,
-    scene: 'O governo anunciou um novo plano econômico em cadeia nacional: preços congelados, inclusive a tabela comercial. Marta já fez as contas e não gostou.',
-    options: [
-      { id: 'reajustar_antes', label: 'Reajustar a tabela antes do congelamento', effects: { priceMult: 1.06, reputation: { market: -2 }, npc: [{ target: 'comercial', mood: 4 }] } },
-      { id: 'absorver', label: 'Absorver o impacto', effects: { priceMult: 0.94, npc: [{ target: 'presidente', mood: -4 }] } },
-      { id: 'cortar', label: 'Cortar custos de produção', effects: { budget: -0.03, npc: [{ target: 'artistico', mood: -8 }] } },
-    ],
-    defaultOption: 'absorver', blocking: true,
-  },
-  {
-    id: 'censura_previa', category: 'era', title: 'Censura corta capítulo', severity: 'medio', tone: 'negativo',
-    subject: 'program', trigger: [['program.isNovela', 'true'], ['game.year', 'lte', 1985]],
-    baseProb: 0.12, eras: ['80s'], universe: U, speaker: 'npc_juridico', cooldownWeeks: 16,
-    scene: 'O censor federal devolveu o capítulo de {program} com cortes em três cenas. A Dra. Helena avisa que exibir sem os cortes pode tirar a novela do ar.',
-    options: [
-      { id: 'cortar', label: 'Cortar as cenas', effects: { program: { target: 'context', quality: -3 }, npc: [{ target: 'artistico', mood: -6 }] } },
-      { id: 'negociar', label: 'Negociar em Brasília', effects: { agenda: -3, cashWeeks: -0.02, npc: [{ target: 'juridico', trust: 3 }] } },
-      { id: 'desafiar', label: 'Exibir sem cortes', effects: { program: { target: 'context', buzz: 12 }, fine: 0.08, reputation: { critics: 3 }, npc: [{ target: 'presidente', mood: -8 }] } },
-    ],
-    defaultOption: 'cortar', blocking: true,
-  },
-  {
-    id: 'cobertura_diretas', category: 'era', title: 'Comícios das Diretas lotam as praças', severity: 'medio', tone: 'neutro',
-    subject: 'none', trigger: [['game.year', 'eq', 1984], ['game.month', 'lte', 4]],
-    baseProb: 0.4, eras: ['80s'], universe: U, speaker: 'npc_jornalismo', cooldownWeeks: 52, oncePerGame: true,
-    scene: 'Os comícios pelas eleições diretas reúnem multidões. Henrique quer cobertura ao vivo; o presidente prefere cautela.',
-    options: [
-      { id: 'ao_vivo', label: 'Cobertura ao vivo', effects: { reputation: { critics: 4, public: 3 }, npc: [{ target: 'jornalismo', mood: 15, trust: 8 }, { target: 'presidente', mood: -8 }] } },
-      { id: 'discreta', label: 'Cobertura discreta no telejornal', effects: { npc: [{ target: 'jornalismo', mood: -6 }, { target: 'presidente', mood: 3 }] } },
-    ],
-    defaultOption: 'discreta',
-  },
-  {
-    id: 'hiperinflacao_tabela', category: 'era', title: 'Inflação corrói a tabela', severity: 'leve', tone: 'negativo',
-    subject: 'none', trigger: [['game.year', 'lte', 1994]],
-    baseProb: 0.08, eras: ['80s', '90s'], universe: U, speaker: 'npc_comercial', cooldownWeeks: 12,
-    scene: 'Com a inflação acima de 20% ao mês, a tabela comercial vira pó em semanas. Marta quer reajuste mensal automático.',
-    options: [
-      { id: 'reajuste', label: 'Reajuste mensal automático', effects: { priceMult: 1.04, occupancy: { delta: -0.03, weeks: 6 } } },
-      { id: 'segurar', label: 'Segurar o preço para não perder cliente', effects: { priceMult: 0.97, occupancy: { delta: 0.02, weeks: 6 } } },
-    ],
-    defaultOption: 'segurar',
-  },
-  {
-    id: 'afiliada_telex', category: 'era', title: 'Telex urgente das afiliadas', severity: 'leve', tone: 'neutro',
-    subject: 'none', trigger: [],
-    baseProb: 0.04, eras: ['80s'], universe: U, speaker: 'npc_comercial', cooldownWeeks: 30,
-    scene: 'Chegou telex das afiliadas do Sul: querem mais programação regional no sábado à tarde. Prometem retribuir com comercial local.',
-    options: [
-      { id: 'aceitar', label: 'Liberar a janela', effects: { cashWeeks: 0.02, reputation: { market: 1 } } },
-      { id: 'negar', label: 'Negar', effects: { reputation: { market: -1 } } },
-    ],
-    defaultOption: 'negar',
-  },
-  {
-    id: 'videocassete', category: 'era', title: 'Locadoras de vídeo roubam o público dos filmes', severity: 'leve', tone: 'negativo',
-    subject: 'none', trigger: [['game.year', 'gte', 1987]],
-    baseProb: 0.04, eras: ['80s', '90s'], universe: U, speaker: 'npc_pesquisa', cooldownWeeks: 52,
-    scene: 'Caio mostra a pesquisa: o videocassete chegou às casas de classe média e as sessões de filmes do fim de semana perdem público AB.',
-    options: [
-      { id: 'estreias', label: 'Comprar filmes mais recentes', effects: { addOffer: 'filmes_premium' } },
-      { id: 'aceitar', label: 'Aceitar a perda', effects: {} },
-    ],
-    defaultOption: 'aceitar',
-  },
-  // ======================= ERA: ANOS 90 =======================
-  {
-    id: 'plano_real', category: 'era', title: 'Plano Real aquece o consumo', severity: 'leve', tone: 'positivo',
-    subject: 'none', trigger: [['game.year', 'eq', 1994], ['game.month', 'gte', 7]],
-    baseProb: 0.5, eras: ['90s'], universe: U, speaker: 'npc_comercial', cooldownWeeks: 52, oncePerGame: true,
-    scene: 'Com a nova moeda, o consumo explodiu: televisores, eletrodomésticos e anunciantes novos batendo à porta. Marta quer aproveitar a onda.',
-    options: [
-      { id: 'subir_tabela', label: 'Subir a tabela', effects: { priceMult: 1.06, occupancy: { delta: 0.03, weeks: 20 } } },
-      { id: 'investir', label: 'Investir em produção nova', effects: { budget: 0.04, npc: [{ target: 'artistico', mood: 10 }] } },
-    ],
-    defaultOption: 'subir_tabela',
-  },
-  {
-    id: 'guerra_domingo', category: 'era', title: 'A guerra do domingo esquenta', severity: 'medio', tone: 'neutro',
-    subject: 'none', trigger: [['player.hasSundayShow', 'true']],
-    baseProb: 0.08, eras: ['90s', '00s'], universe: U, speaker: 'npc_pesquisa', cooldownWeeks: 20,
-    scene: 'A {rival} anunciou quadros novos e prêmios milionários para o domingo à tarde. A disputa pelo ponto a ponto virou assunto nacional.',
-    options: [
-      { id: 'quadros', label: 'Investir em quadros e prêmios', effects: { cashWeeks: -0.05, flag: { domingo_turbinado: 6 }, allBuzz: 2 } },
-      { id: 'apelar', label: 'Apelar para quadros polêmicos', effects: { flag: { domingo_apelativo: 6 }, reputation: { critics: -4, market: -1 }, allBuzz: 3 } },
-      { id: 'manter', label: 'Manter a linha', effects: { reputation: { critics: 1 } } },
-    ],
-    defaultOption: 'manter',
-  },
-  {
-    id: 'tv_paga_chega', category: 'era', title: 'A TV por assinatura chega', severity: 'leve', tone: 'neutro',
-    subject: 'none', trigger: [['game.year', 'gte', 1992]],
-    baseProb: 0.04, eras: ['90s'], universe: U, speaker: 'npc_pesquisa', cooldownWeeks: 104, oncePerGame: true,
-    scene: 'As operadoras de TV paga começam a vender pacotes nas capitais. Por enquanto é coisa de elite, mas Caio já vê efeito no público AB do pós-nobre.',
-    options: [
-      { id: 'parceria', label: 'Licenciar o acervo para canais pagos', effects: { cashWeeks: 0.05, reputation: { market: 1 } } },
-      { id: 'ignorar', label: 'Ignorar', effects: {} },
-    ],
-    defaultOption: 'ignorar',
-  },
-  {
-    id: 'minuto_a_minuto', category: 'era', title: 'Sistema de minuto a minuto em tempo real', severity: 'leve', tone: 'positivo',
-    subject: 'none', trigger: [['player.mbm', 'false']],
-    baseProb: 0.1, eras: ['90s'], universe: U, speaker: 'npc_pesquisa', cooldownWeeks: 26,
-    scene: 'Caio quer contratar o serviço de audiência minuto a minuto em tempo real. "Dá para segurar o quadro quando o público sobe."',
-    options: [
-      { id: 'contratar', label: 'Contratar o serviço', effects: { cashWeeks: -0.03, research: 10, flag: { mbm: true }, npc: [{ target: 'pesquisa', mood: 12, trust: 6 }] } },
-      { id: 'recusar', label: 'Recusar', effects: { npc: [{ target: 'pesquisa', mood: -6 }] } },
-    ],
-    defaultOption: 'recusar',
-  },
-  {
-    id: 'quadro_apelativo', category: 'era', title: 'Quadro apelativo vira escândalo', severity: 'medio', tone: 'negativo',
-    subject: 'program', trigger: [['program.genre', 'in', ['auditorio', 'game_show', 'humoristico']]],
-    baseProb: 0.05, eras: ['90s', '00s'], universe: U, speaker: 'npc_juridico', cooldownWeeks: 26,
-    scene: 'Um quadro de {program} com apelo sensual explodiu em audiência e em reclamações. O Ministério Público pediu explicações.',
-    options: [
-      { id: 'manter', label: 'Manter o quadro', effects: { program: { target: 'context', appeal: 5, buzz: 8 }, reputation: { critics: -4, market: -2 }, fine: 0.03 } },
-      { id: 'tirar', label: 'Tirar o quadro do ar', effects: { program: { target: 'context', appeal: -4 }, reputation: { critics: 2 }, npc: [{ target: 'juridico', trust: 5 }] } },
-    ],
-    defaultOption: 'tirar',
-  },
-  // ======================= ERA: ANOS 2000 =======================
-  {
-    id: 'leilao_reality', category: 'era', title: 'Leilão por formato de reality', severity: 'medio', tone: 'neutro',
-    subject: 'none', trigger: [['player.hasReality', 'false']],
-    baseProb: 0.08, eras: ['00s', '10s'], universe: U, speaker: 'npc_artistico', cooldownWeeks: 26,
-    scene: 'O formato de confinamento que é febre no mundo está sendo leiloado. A {rival} já fez lance.',
-    options: [
-      { id: 'lance', label: 'Ver a oferta no mercado', effects: { addOffer: 'formato_reality' } },
-      { id: 'passar', label: 'Passar', effects: {} },
-    ],
-    defaultOption: 'passar',
-  },
-  {
-    id: 'tv_digital', category: 'era', title: 'Investimento na TV digital', severity: 'medio', tone: 'neutro',
-    subject: 'none', trigger: [['game.year', 'gte', 2007]],
-    baseProb: 0.08, eras: ['00s', '10s'], universe: U, speaker: 'npc_presidente', cooldownWeeks: 104, oncePerGame: true,
-    scene: 'A TV digital começa nas capitais. Equipamento HD custa caro, mas quem chegar primeiro ganha imagem de modernidade.',
-    options: [
-      { id: 'investir', label: 'Investir já', effects: { cashWeeks: -0.15, reputation: { market: 4, public: 2 } } },
-      { id: 'adiar', label: 'Adiar', effects: { reputation: { market: -1 } } },
-    ],
-    defaultOption: 'adiar',
-  },
-  {
-    id: 'crise_2008', category: 'era', title: 'Crise financeira global', severity: 'grave', tone: 'negativo',
-    subject: 'none', trigger: [['game.year', 'in', [2008, 2009]]],
-    baseProb: 0.25, eras: ['00s'], universe: U, speaker: 'npc_comercial', cooldownWeeks: 104, oncePerGame: true,
-    scene: 'A crise nos bancos americanos chegou aqui: anunciantes congelaram verbas e o presidente pediu corte de custos em toda a casa.',
-    options: [
-      { id: 'cortar', label: 'Cortar 5% da verba de programação', effects: { budget: -0.05, occupancy: { delta: -0.05, weeks: 12 }, npc: [{ target: 'presidente', trust: 4 }] } },
-      { id: 'manter', label: 'Manter investimento e brigar por mercado', effects: { occupancy: { delta: -0.08, weeks: 12 }, npc: [{ target: 'presidente', trust: -4 }] } },
-    ],
-    defaultOption: 'cortar', blocking: true,
-  },
-  {
-    id: 'votacao_sms', category: 'era', title: 'Votação por celular rende receita', severity: 'leve', tone: 'positivo',
-    subject: 'program', trigger: [['program.genre', 'in', ['reality', 'talent_show']]],
-    baseProb: 0.2, eras: ['00s', '10s'], universe: U, speaker: 'npc_comercial', cooldownWeeks: 20,
-    scene: 'A operadora quer dividir a receita das votações por celular em {program}. Dinheiro novo, sem tirar um segundo de intervalo.',
-    options: [
-      { id: 'aceitar', label: 'Aceitar a parceria', effects: { cashWeeks: 0.05, program: { target: 'context', buzz: 4 } } },
-      { id: 'recusar', label: 'Recusar', effects: {} },
-    ],
-    defaultOption: 'aceitar',
-  },
-  // ======================= ERA: ANOS 2010 =======================
+  // ======================= ERA: ATUAL =======================
   {
     id: 'viralizacao_negativa', category: 'era', title: 'Viralização negativa nas redes', severity: 'medio', tone: 'negativo',
     subject: 'program', trigger: [],
-    baseProb: 0.06, eras: ['10s', 'now'], universe: U, speaker: 'npc_promocao', cooldownWeeks: 12,
+    baseProb: 0.06, eras: U, universe: U, speaker: 'npc_promocao', cooldownWeeks: 12,
     scene: 'Um trecho de {program} viralizou do jeito errado: a hashtag com o nome da emissora está no topo dos assuntos do momento, e não é elogio.',
     options: [
       { id: 'desculpas', label: 'Pedir desculpas', effects: { reputation: { public: 1, critics: 1 }, program: { target: 'context', buzz: -4 } } },
@@ -790,7 +619,7 @@ export const EVENT_TEMPLATES: EventTemplate[] = [
   {
     id: 'trending_positivo', category: 'era', title: 'Programa nos assuntos do momento', severity: 'leve', tone: 'positivo',
     subject: 'program', trigger: [['program.buzz', 'gte', 35]],
-    baseProb: 0.15, eras: ['10s', 'now'], universe: U, speaker: 'npc_promocao', cooldownWeeks: 6,
+    baseProb: 0.15, eras: U, universe: U, speaker: 'npc_promocao', cooldownWeeks: 6,
     scene: '{program} ficou a noite inteira entre os assuntos mais comentados. Rodrigo quer surfar a onda com conteúdo extra nas redes.',
     options: [
       { id: 'aproveitar', label: 'Produzir conteúdo extra', effects: { cashWeeks: -0.01, program: { target: 'context', buzz: 10 }, reputation: { public: 2 } } },
@@ -801,7 +630,7 @@ export const EVENT_TEMPLATES: EventTemplate[] = [
   {
     id: 'streaming_quer_novela', category: 'era', title: 'Streaming quer licenciar sua novela', severity: 'leve', tone: 'positivo',
     subject: 'program', trigger: [['program.isNovela', 'true'], ['program.quality', 'gte', 60]],
-    baseProb: 0.06, eras: ['10s', 'now'], universe: U, speaker: 'npc_comercial', cooldownWeeks: 26,
+    baseProb: 0.06, eras: U, universe: U, speaker: 'npc_comercial', cooldownWeeks: 26,
     scene: 'Uma plataforma de streaming quer licenciar {program} para o mundo todo. Pagam bem, mas querem exclusividade de reprise por dois anos.',
     options: [
       { id: 'licenciar', label: 'Licenciar', effects: { cashWeeks: 0.12, flag: { sem_reprise: true } } },
@@ -810,43 +639,9 @@ export const EVENT_TEMPLATES: EventTemplate[] = [
     defaultOption: 'recusar',
   },
   {
-    id: 'desligamento_analogico', category: 'era', title: 'Desligamento do sinal analógico', severity: 'medio', tone: 'neutro',
-    subject: 'none', trigger: [['game.year', 'gte', 2016]],
-    baseProb: 0.06, eras: ['10s'], universe: U, speaker: 'npc_presidente', cooldownWeeks: 104, oncePerGame: true,
-    scene: 'O sinal analógico será desligado na sua praça principal. Quem não estiver bem no digital some do controle remoto.',
-    options: [
-      { id: 'investir', label: 'Investir em cobertura digital', effects: { cashWeeks: -0.12, reputation: { market: 2 } } },
-      { id: 'minimo', label: 'Fazer o mínimo', effects: { tle: { mult: 0.98, weeks: 8 } } },
-    ],
-    defaultOption: 'minimo',
-  },
-  {
-    id: 'publicidade_infantil', category: 'era', title: 'Restrição à publicidade infantil', severity: 'leve', tone: 'negativo',
-    subject: 'none', trigger: [['player.hasKids', 'true']],
-    baseProb: 0.06, eras: ['10s'], universe: U, speaker: 'npc_juridico', cooldownWeeks: 104, oncePerGame: true,
-    scene: 'Nova resolução restringe a publicidade dirigida a crianças. A faixa infantil perde anunciantes da noite para o dia.',
-    options: [
-      { id: 'adaptar', label: 'Adaptar a faixa infantil', effects: { npc: [{ target: 'juridico', trust: 4 }], reputation: { critics: 1 } } },
-      { id: 'substituir', label: 'Estudar substituir a faixa', effects: { npc: [{ target: 'comercial', mood: 4 }] } },
-    ],
-    defaultOption: 'adaptar',
-  },
-  {
-    id: 'pandemia', category: 'era', title: 'Pandemia paralisa gravações', severity: 'grave', tone: 'negativo',
-    subject: 'none', trigger: [['game.year', 'eq', 2020], ['game.month', 'in', [3, 4]]],
-    baseProb: 0.9, eras: ['now'], universe: U, speaker: 'npc_presidente', cooldownWeeks: 104, oncePerGame: true,
-    scene: 'As gravações foram suspensas por tempo indeterminado. O público está em casa, mas os anunciantes sumiram e as novelas inéditas vão acabar.',
-    options: [
-      { id: 'reprises', label: 'Entrar com reprises de sucesso', effects: { allBuzz: -5, npc: [{ target: 'artistico', mood: -6 }] } },
-      { id: 'jornalismo', label: 'Ampliar o jornalismo', effects: { reputation: { critics: 4, public: 3 }, npc: [{ target: 'jornalismo', mood: 15 }], cashWeeks: -0.04 } },
-    ],
-    defaultOption: 'reprises', blocking: true,
-  },
-  // ======================= ERA: ATUAL =======================
-  {
     id: 'dtv_plus', category: 'era', title: 'Upgrade DTV+ (TV 3.0)', severity: 'medio', tone: 'neutro',
     subject: 'none', trigger: [['game.year', 'gte', 2026]],
-    baseProb: 0.06, eras: ['now'], universe: U, speaker: 'npc_presidente', cooldownWeeks: 104, oncePerGame: true,
+    baseProb: 0.06, eras: U, universe: U, speaker: 'npc_presidente', cooldownWeeks: 104, oncePerGame: true,
     scene: 'A TV 3.0 entrou em operação comercial. Interatividade, aplicativo do canal e publicidade segmentada exigem investimento agora.',
     options: [
       { id: 'investir', label: 'Investir', effects: { cashWeeks: -0.15, reputation: { market: 4 }, priceMult: 1.03 } },
@@ -858,7 +653,7 @@ export const EVENT_TEMPLATES: EventTemplate[] = [
   {
     id: 'youtube_cortes', category: 'era', title: 'Cortes do seu programa bombam no YouTube', severity: 'leve', tone: 'positivo',
     subject: 'program', trigger: [['program.groupIn', 'in', ['humor', 'variedade', 'reality']]],
-    baseProb: 0.1, eras: ['now'], universe: U, speaker: 'npc_promocao', cooldownWeeks: 10,
+    baseProb: 0.1, eras: U, universe: U, speaker: 'npc_promocao', cooldownWeeks: 10,
     scene: 'Canais de cortes estão faturando com trechos de {program}. Rodrigo quer um canal oficial; a Dra. Helena quer derrubar os piratas.',
     options: [
       { id: 'canal', label: 'Criar canal oficial de cortes', effects: { cashWeeks: 0.03, program: { target: 'context', buzz: 8 }, reputation: { public: 1 } } },
@@ -869,7 +664,7 @@ export const EVENT_TEMPLATES: EventTemplate[] = [
   {
     id: 'influenciador', category: 'era', title: 'Contratar um influenciador digital', severity: 'leve', tone: 'neutro',
     subject: 'none', trigger: [],
-    baseProb: 0.05, eras: ['10s', 'now'], universe: U, speaker: 'npc_promocao', cooldownWeeks: 26,
+    baseProb: 0.05, eras: U, universe: U, speaker: 'npc_promocao', cooldownWeeks: 26,
     scene: 'Um influenciador com milhões de seguidores quer apresentar um programa na TV aberta. Os jovens adoram; a crítica torce o nariz.',
     options: [
       { id: 'contratar', label: 'Ver a oferta no mercado', effects: { addOffer: 'talento_influenciador' } },
@@ -880,7 +675,7 @@ export const EVENT_TEMPLATES: EventTemplate[] = [
   {
     id: 'janela_streaming', category: 'era', title: 'Estreia primeiro no streaming?', severity: 'leve', tone: 'neutro',
     subject: 'program', trigger: [['program.inDevelopment', 'true']],
-    baseProb: 0.12, eras: ['now'], universe: U, speaker: 'npc_comercial', cooldownWeeks: 12,
+    baseProb: 0.12, eras: U, universe: U, speaker: 'npc_comercial', cooldownWeeks: 12,
     scene: 'A diretoria digital quer lançar {program} primeiro no streaming da casa, uma semana antes da TV. Marta acha que mata a estreia na grade.',
     options: [
       { id: 'streaming', label: 'Estreia no streaming primeiro', effects: { cashWeeks: 0.03, program: { target: 'context', buzz: 6, appeal: -3 } } },
@@ -891,7 +686,7 @@ export const EVENT_TEMPLATES: EventTemplate[] = [
   {
     id: 'crossmedia', category: 'era', title: 'Anunciante quer pacote cross-media', severity: 'leve', tone: 'positivo',
     subject: 'none', trigger: [],
-    baseProb: 0.08, eras: ['now'], universe: U, speaker: 'npc_comercial', cooldownWeeks: 12,
+    baseProb: 0.08, eras: U, universe: U, speaker: 'npc_comercial', cooldownWeeks: 12,
     scene: '{advertiser} quer comprar audiência somada TV + digital. "Se a gente entregar o pacote, é dinheiro que hoje vai para o YouTube", diz Marta.',
     options: [
       { id: 'montar', label: 'Montar o pacote cross-media', effects: { cashWeeks: 0.05, agenda: -2, reputation: { market: 2 } } },

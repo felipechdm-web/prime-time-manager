@@ -146,7 +146,7 @@ export interface AdvertiserDef {
   avoids: GenreId[];
 }
 
-const ALL: EraId[] = ['80s', '90s', '00s', '10s', 'now'];
+const ALL: EraId[] = ['now'];
 
 export const ADVERTISERS: AdvertiserDef[] = [
   { name: 'Supermercados Boa Compra', sector: 'varejo', eras: ALL, likes: ['novela_21h', 'auditorio', 'futebol'], avoids: [] },
@@ -157,7 +157,7 @@ export const ADVERTISERS: AdvertiserDef[] = [
   { name: 'Magazine Lar Feliz', sector: 'varejo', eras: ALL, likes: ['auditorio', 'novela_18h', 'feminino'], avoids: [] },
   { name: 'Cosméticos Belíssima', sector: 'beleza', eras: ALL, likes: ['novela_21h', 'feminino', 'reality'], avoids: ['policial'] },
   { name: 'Laticínios Vale Verde', sector: 'alimentos', eras: ALL, likes: ['infantil', 'feminino', 'novela_18h'], avoids: ['policial'] },
-  { name: 'Telefonia Conecta', sector: 'telecom', eras: ['90s', '00s', '10s', 'now'], likes: ['reality', 'novela_19h', 'futebol'], avoids: [] },
+  { name: 'Telefonia Conecta', sector: 'telecom', eras: ALL, likes: ['reality', 'novela_19h', 'futebol'], avoids: [] },
   { name: 'Farmácias Saúde Mais', sector: 'farma', eras: ALL, likes: ['telejornal', 'feminino', 'novela_18h'], avoids: [] },
   { name: 'Construtora Alicerce', sector: 'imobiliário', eras: ALL, likes: ['telejornal', 'revista_eletronica'], avoids: ['policial'] },
   { name: 'Seguradora Amparo', sector: 'seguros', eras: ALL, likes: ['telejornal', 'futebol'], avoids: [] },
@@ -165,10 +165,10 @@ export const ADVERTISERS: AdvertiserDef[] = [
   { name: 'Sabão Brilho', sector: 'limpeza', eras: ALL, likes: ['novela_18h', 'novela_19h', 'feminino'], avoids: [] },
   { name: 'Calçados Passo Firme', sector: 'vestuário', eras: ALL, likes: ['futebol', 'novela_juvenil', 'musical'], avoids: [] },
   { name: 'Céu Azul Linhas Aéreas', sector: 'turismo', eras: ALL, likes: ['revista_eletronica', 'documentario', 'serie_nacional'], avoids: ['policial'] },
-  { name: 'Lanchonetes Brasa', sector: 'alimentação', eras: ['90s', '00s', '10s', 'now'], likes: ['reality', 'futebol', 'humoristico'], avoids: [] },
-  { name: 'Cartões Credmais', sector: 'financeiro', eras: ['90s', '00s', '10s', 'now'], likes: ['novela_21h', 'futebol'], avoids: [] },
-  { name: 'Loja Virtual Clique', sector: 'e-commerce', eras: ['00s', '10s', 'now'], likes: ['reality', 'talent_show', 'novela_21h'], avoids: [] },
-  { name: 'App Entrega Já', sector: 'digital', eras: ['10s', 'now'], likes: ['reality', 'futebol', 'humoristico'], avoids: [] },
+  { name: 'Lanchonetes Brasa', sector: 'alimentação', eras: ALL, likes: ['reality', 'futebol', 'humoristico'], avoids: [] },
+  { name: 'Cartões Credmais', sector: 'financeiro', eras: ALL, likes: ['novela_21h', 'futebol'], avoids: [] },
+  { name: 'Loja Virtual Clique', sector: 'e-commerce', eras: ALL, likes: ['reality', 'talent_show', 'novela_21h'], avoids: [] },
+  { name: 'App Entrega Já', sector: 'digital', eras: ALL, likes: ['reality', 'futebol', 'humoristico'], avoids: [] },
   { name: 'Brinquedos Pirilampo', sector: 'brinquedos', eras: ALL, likes: ['infantil', 'novela_juvenil'], avoids: ['policial', 'reality'] },
   { name: 'Eletrodomésticos Polar', sector: 'eletro', eras: ALL, likes: ['novela_21h', 'auditorio', 'game_show'], avoids: [] },
 ];

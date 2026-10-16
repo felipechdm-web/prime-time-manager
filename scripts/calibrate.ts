@@ -1,5 +1,5 @@
 // Script de calibração (seção 9.8 do documento-mestre).
-// Uso:  node scripts/calibrate.ts [--era 90s] [--weeks 12] [--seeds 6] [--universe real|fictional]
+// Uso:  node scripts/calibrate.ts [--weeks 12] [--seeds 6] [--universe real|fictional]
 // Valida: (1) share da líder no nobre dentro da faixa plausível; (2) soma de shares <= 100;
 // (3) decisões boas (estreia com chamadas, contraprogramação) rendem >= 1 ponto na média;
 // (4) o ruído não domina a estratégia ao longo de um mês.
@@ -9,7 +9,7 @@ import { simulate } from '../supabase/functions/_shared/engine/sim.ts';
 import { applyIntent } from '../supabase/functions/_shared/engine/intents.ts';
 import { resolveEvent } from '../supabase/functions/_shared/engine/eventsEngine.ts';
 import { computeDay } from '../supabase/functions/_shared/engine/audience.ts';
-import { ERA_ORDER, REAL_STATIONS } from '../supabase/functions/_shared/engine/catalog/eras.ts';
+import { ERA_ORDER, ERAS, REAL_STATIONS } from '../supabase/functions/_shared/engine/catalog/eras.ts';
 import { getProgram, playerStation } from '../supabase/functions/_shared/engine/state.ts';
 import type { EraId, GameState, ScenarioId, Universe } from '../supabase/functions/_shared/engine/types.ts';
 
@@ -18,7 +18,7 @@ function arg(name: string, def: string): string {
   const i = args.indexOf(`--${name}`);
   return i >= 0 && args[i + 1] ? args[i + 1] : def;
 }
-const eras: EraId[] = arg('era', 'all') === 'all' ? ERA_ORDER : [arg('era', '90s') as EraId];
+const eras: EraId[] = ERA_ORDER; // só a era atual
 const WEEKS = parseInt(arg('weeks', '8'), 10);
 const SEEDS = parseInt(arg('seeds', '4'), 10);
 const universe = arg('universe', 'real') as Universe;
@@ -26,15 +26,11 @@ const scenario = arg('scenario', 'emissora_crise') as ScenarioId;
 const verbose = args.includes('--verbose');
 
 const LEADER_SHARE: Record<EraId, [number, number]> = {
-  '80s': [45, 75],
-  '90s': [40, 65],
-  '00s': [35, 60],
-  '10s': [28, 50],
   now: [24, 45],
 };
 
 function startYear(era: EraId): number {
-  return { '80s': 1985, '90s': 1994, '00s': 2004, '10s': 2014, now: 2026 }[era];
+  return ERAS[era].playableYears[0];
 }
 
 function makeGame(era: EraId, seed: number): GameState {
@@ -149,7 +145,6 @@ for (const era of eras) {
         const p = getProgram(g, pid);
         if (!p) return;
         p.genre = p.genre.startsWith('novela') ? 'reality' : 'novela_21h';
-        if (era === '80s' && p.genre === 'reality') p.genre = 'humoristico';
         p.appeal = Math.min(99, p.appeal + 8);
       });
       counterGains.push(p2 - p0);

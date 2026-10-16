@@ -1,11 +1,11 @@
 // Tela de "Contratação" (seção 4): as cinco escolhas da partida + entrevista com o dono.
 
 import { useEffect, useMemo, useState } from 'react';
-import { ERAS, ERA_ORDER, REAL_STATIONS } from '@engine/catalog/eras.ts';
+import { ERAS, REAL_STATIONS } from '@engine/catalog/eras.ts';
 import { FICTIONAL_STATIONS } from '@engine/catalog/names.ts';
 import { SCENARIOS } from '@engine/setup.ts';
 import { firstMondayOfYear } from '@engine/time.ts';
-import type { Background, Difficulty, EraId, ScenarioId, Universe } from '@engine/types.ts';
+import type { Background, Difficulty, ScenarioId, Universe } from '@engine/types.ts';
 import type { MestreOutput } from '@game/types.ts';
 import { backendSync } from '../lib/backend.ts';
 import { go } from '../lib/router.ts';
@@ -14,12 +14,12 @@ import { useUI } from '../lib/ui.ts';
 import { Button, Field, inputClass } from '../components/ui.tsx';
 import { SceneView } from '../components/SceneView.tsx';
 
-const BACKGROUNDS: { id: Background; label: string; bonus: string; penalty: string; onlyNow?: boolean }[] = [
+const BACKGROUNDS: { id: Background; label: string; bonus: string; penalty: string }[] = [
   { id: 'jornalista', label: 'Ex-jornalista', bonus: 'Credibilidade com o Jornalismo; menos crise de imagem', penalty: 'Desconfiança do Comercial' },
   { id: 'publicitario', label: 'Ex-publicitário', bonus: 'Negocia cotas e tabela com +10% de preço', penalty: 'Artistas o veem como "homem do dinheiro"' },
   { id: 'produtor_auditorio', label: 'Ex-produtor de auditório', bonus: 'Programas populares rendem mais', penalty: 'Crítica mais dura' },
   { id: 'herdeiro', label: 'Herdeiro da família dona', bonus: 'Mais paciência da presidência', penalty: 'Equipe cética; menos lealdade inicial' },
-  { id: 'streaming', label: 'Executivo de streaming', bonus: 'Domina dados e multiplataforma (pesquisa mais precisa)', penalty: 'Pouca intimidade com a TV aberta', onlyNow: true },
+  { id: 'streaming', label: 'Executivo de streaming', bonus: 'Domina dados e multiplataforma (pesquisa mais precisa)', penalty: 'Pouca intimidade com a TV aberta' },
 ];
 
 const DIFFS: { id: Difficulty; label: string; text: string }[] = [
@@ -27,6 +27,9 @@ const DIFFS: { id: Difficulty; label: string; text: string }[] = [
   { id: 'diretor', label: 'Diretor', text: 'Padrão: ruído realista e concorrentes reativos.' },
   { id: 'lenda', label: 'Lenda da TV', text: 'Ruído alto, concorrentes agressivos, presidente impaciente, mais crises.' },
 ];
+
+// o jogo tem só a era atual: toda partida começa na primeira semana de 2026
+const YEAR = ERAS.now.playableYears[0];
 
 const COLORS = ['#facc15', '#f43f5e', '#22d3ee', '#a78bfa', '#34d399', '#fb923c', '#60a5fa', '#e879f9'];
 
@@ -58,8 +61,6 @@ export function NewGame() {
   const [carry] = useState(readCarry);
   const [step, setStep] = useState(0);
   const [universe, setUniverse] = useState<Universe>('real');
-  const [era, setEra] = useState<EraId>('90s');
-  const [year, setYear] = useState<number>(1994);
   const [stationMode, setStationMode] = useState<'fictional' | 'real'>('fictional');
   const [realKey, setRealKey] = useState<string>('');
   const [stationName, setStationName] = useState('TV Horizonte');
@@ -68,7 +69,7 @@ export function NewGame() {
   const [difficulty, setDifficulty] = useState<Difficulty>('diretor');
   const [name, setName] = useState(carry?.name ?? '');
   const [pronoun, setPronoun] = useState<'o' | 'a' | 'e'>(carry?.pronoun ?? 'o');
-  const [background, setBackground] = useState<Background>(carry?.background && carry.background !== 'streaming' ? carry.background : 'jornalista');
+  const [background, setBackground] = useState<Background>(carry?.background ?? 'jornalista');
   const [busy, setBusy] = useState(false);
   const [created, setCreated] = useState<{ gameId: string; interview: MestreOutput } | null>(null);
 
@@ -77,29 +78,28 @@ export function NewGame() {
     window.scrollTo({ top: 0 });
     document.getElementById('root')?.scrollTo({ top: 0 });
   }, [step, created]);
-  document.documentElement.dataset.era = era;
 
-  const startDate = firstMondayOfYear(year);
-  const realStations = useMemo(() => REAL_STATIONS[era].filter((d) => (!d.from || d.from <= startDate) && (!d.until || d.until > startDate)), [era, startDate]);
+  const startDate = firstMondayOfYear(YEAR);
+  const realStations = useMemo(() => REAL_STATIONS.now.filter((d) => (!d.from || d.from <= startDate) && (!d.until || d.until > startDate)), [startDate]);
   const realChosen = universe === 'real' && stationMode === 'real' && realKey;
   const allowedScenarios: ScenarioId[] = universe === 'real' ? ['emissora_crise', 'rede_nova', 'canal_pago'] : ['lider_ameacada', 'vice_ambiciosa', 'emissora_crise', 'rede_nova', 'canal_pago'];
 
-  const steps = ['Universo', 'Era', 'Emissora', 'Cenário', 'Dificuldade', 'Você'];
+  const steps = ['Universo', 'Emissora', 'Cenário', 'Dificuldade', 'Você'];
 
   const canNext = () => {
-    if (step === 2 && universe === 'real' && stationMode === 'real' && !realKey) return false;
-    if (step === 2 && stationMode === 'fictional' && !stationName.trim()) return false;
-    if (step === 5 && !name.trim()) return false;
+    if (step === 1 && universe === 'real' && stationMode === 'real' && !realKey) return false;
+    if (step === 1 && stationMode === 'fictional' && !stationName.trim()) return false;
+    if (step === 4 && !name.trim()) return false;
     return true;
   };
 
   const next = () => {
-    if (step === 2 && realChosen) setStep(4);
-    else setStep((s) => Math.min(5, s + 1));
+    if (step === 1 && realChosen) setStep(3);
+    else setStep((s) => Math.min(4, s + 1));
   };
   const back = () => {
     if (step === 0) go('/');
-    else if (step === 4 && realChosen) setStep(2);
+    else if (step === 3 && realChosen) setStep(1);
     else setStep((s) => s - 1);
   };
 
@@ -108,8 +108,6 @@ export function NewGame() {
     try {
       const res = await backendSync().call<{ gameId: string; interview: MestreOutput }>('create-game', {
         universe,
-        era,
-        startYear: year,
         scenario: realChosen ? 'vice_ambiciosa' : scenario,
         difficulty,
         player: { name: name.trim(), background, pronoun },
@@ -162,7 +160,7 @@ export function NewGame() {
       {step === 0 && (
         <div className="space-y-2">
           <Choice selected={universe === 'real'} onClick={() => setUniverse('real')} title="Brasil real">
-            Concorrentes reais da época (Globo, SBT, Record, Band, Manchete, RedeTV!, Cultura conforme a década). Você comanda uma emissora fictícia ou assume uma real. Todo personagem que fala é fictício.
+            Concorrentes reais de 2026 (Globo, Record, SBT, Band, RedeTV! e Cultura). Você comanda uma emissora fictícia ou assume uma real. Todo personagem que fala é fictício.
           </Choice>
           <Choice selected={universe === 'fictional'} onClick={() => { setUniverse('fictional'); setStationMode('fictional'); }} title="Brasil fictício">
             Emissoras, programas, artistas e anunciantes inventados, com a mesma mecânica do mercado brasileiro.
@@ -171,29 +169,11 @@ export function NewGame() {
       )}
 
       {step === 1 && (
-        <div className="space-y-2">
-          {ERA_ORDER.map((id) => {
-            const e = ERAS[id];
-            return (
-              <Choice key={id} selected={era === id} onClick={() => { setEra(id); setYear(e.playableYears[Math.min(4, e.playableYears.length - 1)]); if (id !== 'now' && background === 'streaming') setBackground('jornalista'); setRealKey(''); }} title={`${e.name} — ${e.tagline}`}>
-                {e.summary.split('. ').slice(0, 2).join('. ')}.
-              </Choice>
-            );
-          })}
-          <Field label="Ano inicial">
-            <select className={inputClass} value={year} onChange={(e) => setYear(Number(e.target.value))}>
-              {ERAS[era].playableYears.map((y) => <option key={y} value={y}>{y}</option>)}
-            </select>
-          </Field>
-        </div>
-      )}
-
-      {step === 2 && (
         <div className="space-y-3">
           {universe === 'real' && (
             <div className="space-y-2">
               <Choice selected={stationMode === 'fictional'} onClick={() => setStationMode('fictional')} title="Uma emissora fictícia nova ou em crise (recomendado)">
-                Você entra como 5ª ou 6ª força e disputa contra as emissoras reais da época.
+                Você entra como 5ª ou 6ª força e disputa contra as emissoras reais de 2026.
               </Choice>
               <div className="text-xs font-semibold uppercase tracking-wide text-muted">ou assuma uma emissora real</div>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -226,14 +206,13 @@ export function NewGame() {
         </div>
       )}
 
-      {step === 3 && (
+      {step === 2 && (
         <div className="space-y-2">
           {allowedScenarios.map((id) => {
             const s = SCENARIOS[id];
-            const disabled = id === 'canal_pago' && era === '80s';
             return (
-              <Choice key={id} selected={scenario === id} disabled={disabled} onClick={() => setScenario(id)} title={`${s.name} · ${s.difficulty}`}>
-                {s.situation}{disabled ? ' (não existe TV paga nos anos 80)' : ''}
+              <Choice key={id} selected={scenario === id} onClick={() => setScenario(id)} title={`${s.name} · ${s.difficulty}`}>
+                {s.situation}
               </Choice>
             );
           })}
@@ -241,11 +220,11 @@ export function NewGame() {
         </div>
       )}
 
-      {step === 4 && (
+      {step === 3 && (
         <div className="space-y-2">
           {realChosen && (
             <div className="mb-2 rounded-theme bg-surface-2 p-3 text-sm text-muted">
-              Você vai assumir a <b className="text-text">{realStations.find((s) => s.key === realKey)?.name}</b>. O cenário é definido pela posição dela na época.
+              Você vai assumir a <b className="text-text">{realStations.find((s) => s.key === realKey)?.name}</b>. O cenário é definido pela posição dela em 2026.
             </div>
           )}
           {DIFFS.map((d) => (
@@ -254,7 +233,7 @@ export function NewGame() {
         </div>
       )}
 
-      {step === 5 && (
+      {step === 4 && (
         <div className="space-y-3">
           <Field label="Seu nome">
             <input className={inputClass} value={name} maxLength={40} onChange={(e) => setName(e.target.value)} placeholder="Como os personagens vão te chamar" />
@@ -268,7 +247,7 @@ export function NewGame() {
           </Field>
           <div className="space-y-2">
             <span className="block text-xs font-semibold uppercase tracking-wide text-muted">Origem profissional</span>
-            {BACKGROUNDS.filter((b) => !b.onlyNow || era === 'now').map((b) => (
+            {BACKGROUNDS.map((b) => (
               <Choice key={b.id} selected={background === b.id} onClick={() => setBackground(b.id)} title={b.label}>
                 <span className="text-good">+ {b.bonus}</span>
                 <br />
@@ -282,7 +261,7 @@ export function NewGame() {
       <div className="fixed inset-x-0 bottom-0 border-t border-border bg-surface/95 px-4 py-3 backdrop-blur safe-bottom">
         <div className="mx-auto flex max-w-2xl gap-2">
           <Button onClick={back}>{step === 0 ? 'Cancelar' : 'Voltar'}</Button>
-          {step < 5 ? (
+          {step < 4 ? (
             <Button variant="primary" className="flex-1" disabled={!canNext()} onClick={next}>Continuar</Button>
           ) : (
             <Button variant="primary" className="flex-1" disabled={!canNext()} busy={busy} onClick={create}>Ir para a entrevista</Button>

@@ -3,7 +3,7 @@
 // Todo valor em dinheiro dentro do motor está em R$ de 2026; a exibição
 // converte para o valor nominal da era (ver money.ts).
 
-export type EraId = '80s' | '90s' | '00s' | '10s' | 'now';
+export type EraId = 'now'; // v2.1: só a era atual (2026); o tipo segue existindo para o motor ler os parâmetros da era
 export type Universe = 'real' | 'fictional';
 export type Difficulty = 'estagiario' | 'diretor' | 'lenda';
 export type ScenarioId =

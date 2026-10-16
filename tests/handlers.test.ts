@@ -26,7 +26,7 @@ function ctxWith(store: MemoryStore, llm: LLMProvider | null, userId = 'user-a')
 }
 
 const NEW = {
-  universe: 'real', era: '90s', startYear: 1995, scenario: 'emissora_crise', difficulty: 'diretor',
+  universe: 'real', scenario: 'emissora_crise', difficulty: 'diretor',
   player: { name: 'Felipe', background: 'jornalista', pronoun: 'o' }, station: { mode: 'fictional', name: 'TV Horizonte' }, seed: 31337,
 };
 

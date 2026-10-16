@@ -2,7 +2,7 @@
 
 import { airingsOfDay, computeDay } from './audience.ts';
 import type { DayResult } from './audience.ts';
-import { ERAS, REAL_STATIONS } from './catalog/eras.ts';
+import { REAL_STATIONS } from './catalog/eras.ts';
 import { GENRES } from './catalog/genres.ts';
 import { MARKETS } from './catalog/markets.ts';
 import { airingEconomics, closeStationFinance, occupancyFor, recomputePrice } from './commercial.ts';
@@ -20,7 +20,7 @@ import { cloneWeek, habitKeyFor, programsInWeek } from './schedule.ts';
 import { addRealStation, freshWeekProgress, ratingAllowed, SCENARIOS, setupCopaYear } from './setup.ts';
 import {
   activeStations, avgWeeklyRevenue, difficultyMult, getProgram, npcById, npcByRole, playerStation, politicalCapital,
-  pushTimeline, rivals, syncEra,
+  pushTimeline, rivals,
 } from './state.ts';
 import type { GameState, InboxDraft, KpiSet, NpcRole, Station, WeekFinance, WeekReport } from './types.ts';
 import {
@@ -730,22 +730,6 @@ function closeYear(state: GameState, out: SimOutputs, prevYear: number): string[
       ps.reputation.critics = clamp(ps.reputation.critics + 3, 0, 100);
     }
     notes.push(`Troféu Antena de Ouro ${prevYear}: "${best.title}" (${st?.name}).`);
-  }
-  // transição de era
-  if (syncEra(state)) {
-    const era = ERAS[state.meta.era];
-    notes.push(`Começa uma nova era: ${era.name} — ${era.tagline}.`);
-    pushTimeline(state, `Nova era: ${era.name}.`, 'era');
-    inbox(state, { fromNpc: 'npc_pesquisa', subject: `Bem-vindo(a) aos ${era.name.toLowerCase()}`, body: `${era.summary}\n\n${era.currencyNote}`, requiresAction: false, eventId: null, kind: 'mensagem' });
-    if (state.meta.universe === 'real') {
-      for (const def of REAL_STATIONS[state.meta.era]) {
-        const st = state.stations.find((s) => s.realKey === def.key);
-        if (st && !st.isPlayer) {
-          st.archetype = def.archetype;
-          st.power = st.power * 0.5 + def.power * 0.5;
-        }
-      }
-    }
   }
   return notes;
 }

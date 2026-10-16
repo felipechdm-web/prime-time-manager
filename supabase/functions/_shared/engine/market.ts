@@ -176,7 +176,7 @@ function makeOfferRaw(state: GameState, kind: MarketOffer['kind'], rng: Rng, opt
     case 'arrendamento': {
       const band: BandId = rng.pick(['madrugada', 'madrugada', 'manha_cedo', 'manha', 'vespertino']);
       const hours = band === 'madrugada' ? rng.int(2, 5) : rng.int(1, 3);
-      const g: GenreId = state.meta.era === '80s' || rng.chance(0.6) ? 'religioso' : 'televendas';
+      const g: GenreId = rng.chance(0.6) ? 'religioso' : 'televendas';
       const rate = Math.round(leaseRate(state, band) * rng.range(0.85, 1.25));
       const o = baseOffer(state, rng, kind, g, 25, 18);
       o.title = g === 'religioso' ? `Arrendamento: igreja quer ${hours}h diárias` : `Arrendamento: televendas quer ${hours}h diárias`;
@@ -313,7 +313,7 @@ export function refreshOffers(state: GameState): void {
   const kinds: [MarketOffer['kind'], number][] = [
     ['enlatado', 2],
     ['filmes', 1.2],
-    ['formato', state.meta.era === '80s' ? 0 : 0.9],
+    ['formato', 0.9],
     ['projeto', 3],
     ['coproducao', 0.8],
     ['talento', 1],

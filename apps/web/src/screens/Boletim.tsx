@@ -120,7 +120,7 @@ export function Boletim({ gameId, state }: ScreenProps) {
         <>
           <KpiRow state={state} report={report} />
           <div className="grid gap-4 lg:grid-cols-5">
-            <Card title="Bastidores" className="lg:col-span-3" crt action={busy ? <span className="text-xs text-muted">o Mestre está escrevendo...</span> : null}>
+            <Card title="Bastidores" className="lg:col-span-3" action={busy ? <span className="text-xs text-muted">o Mestre está escrevendo...</span> : null}>
               {scene ? <SceneView scene={scene} state={state} /> : <Spinner />}
               {note && <p className="mt-2 text-xs text-muted">{note}</p>}
               {report.closings.length > 0 && (

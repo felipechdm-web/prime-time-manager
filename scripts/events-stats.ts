@@ -1,20 +1,17 @@
 // Estatística rápida de frequência de eventos e ações de rivais (seção 13.4).
-// Uso: node scripts/events-stats.ts [--weeks 40] [--era 90s]
+// Uso: node scripts/events-stats.ts [--weeks 40]
 
 import { newGame } from '../supabase/functions/_shared/engine/newGame.ts';
 import { simulate } from '../supabase/functions/_shared/engine/sim.ts';
 import { applyIntent } from '../supabase/functions/_shared/engine/intents.ts';
 import { resolveEvent } from '../supabase/functions/_shared/engine/eventsEngine.ts';
-import type { EraId } from '../supabase/functions/_shared/engine/types.ts';
 
 const args = process.argv.slice(2);
 const arg = (n: string, d: string) => (args.indexOf(`--${n}`) >= 0 ? args[args.indexOf(`--${n}`) + 1] : d);
 const WEEKS = parseInt(arg('weeks', '40'), 10);
-const era = arg('era', '90s') as EraId;
-const years: Record<EraId, number> = { '80s': 1985, '90s': 1994, '00s': 2004, '10s': 2014, now: 2026 };
 
 const { state } = newGame({
-  universe: 'real', era, startYear: years[era], scenario: 'emissora_crise', difficulty: 'diretor', seed: 77,
+  universe: 'real', era: 'now', startYear: 2026, scenario: 'emissora_crise', difficulty: 'diretor', seed: 77,
   player: { name: 'Teste', background: 'jornalista', pronoun: 'a' }, station: { mode: 'fictional' },
 });
 const seen = new Set<string>();

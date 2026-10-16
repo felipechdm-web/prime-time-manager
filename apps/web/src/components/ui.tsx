@@ -49,9 +49,9 @@ export function Spinner({ small }: { small?: boolean }) {
   return <span className={`inline-block animate-spin rounded-full border-2 border-current border-t-transparent ${small ? 'h-3.5 w-3.5' : 'h-6 w-6'}`} aria-label="carregando" />;
 }
 
-export function Card({ children, className, title, action, crt }: { children: ReactNode; className?: string; title?: ReactNode; action?: ReactNode; crt?: boolean }) {
+export function Card({ children, className, title, action }: { children: ReactNode; className?: string; title?: ReactNode; action?: ReactNode }) {
   return (
-    <section className={`card relative ${crt ? 'crt' : ''} ${className ?? ''}`}>
+    <section className={`card relative ${className ?? ''}`}>
       {(title || action) && (
         <header className="flex items-center justify-between gap-2 border-b border-border px-4 py-2.5">
           <h3 className="text-sm font-bold uppercase tracking-wide text-muted">{title}</h3>

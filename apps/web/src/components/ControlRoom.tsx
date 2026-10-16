@@ -124,7 +124,7 @@ export function ControlRoom({ gameId, state }: { gameId: string; state: GameStat
         </div>
       ) : (
         <div className="space-y-3">
-          <div className="crt relative rounded-theme bg-black/40 p-3">
+          <div className="relative rounded-theme bg-black/40 p-3">
             <div className="flex flex-wrap items-end justify-between gap-2">
               <div>
                 <div className="text-xs uppercase tracking-wide text-muted">{data.moment.reason}</div>

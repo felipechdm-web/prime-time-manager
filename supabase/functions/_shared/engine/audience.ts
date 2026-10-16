@@ -1,7 +1,7 @@
 // Motor de audiência (seção 9): TLE × escolha logit multinomial × herança.
 // Determinístico: depende só do estado, da grade e da semente.
 
-import { ERAS, eraIndex } from './catalog/eras.ts';
+import { ERAS } from './catalog/eras.ts';
 import { GENRES, genreFit } from './catalog/genres.ts';
 import { MARKETS, MARKET_WEIGHTS, SEGMENTS, segmentWeights, TLE_CURVE } from './catalog/markets.ts';
 import { rngFor } from './rng.ts';
@@ -12,7 +12,10 @@ import { addDays, bandOfSlot, dayCalendar, dayType, isPrimeSlot, monthOf, slotCl
 
 // pesos padrão da seção 9.3
 export const W = { q: 0.8, a: 1.6, g: 1.0, b: 0.6, h: 0.7, f: 0.9, t: 0.5 };
-const STATION_POWER_W = 0.7;
+// força da marca da emissora e retenção de público entre faixas, calibradas para a era atual
+// (quando o jogo tinha cinco eras, valiam 0,7 × (1 − 0,1 × 4) e 0,82 − 0,02 × 4)
+const STATION_POWER_W = 0.7 * (1 - 0.1 * 4);
+const RETENTION_IN = 0.82 - 0.02 * 4;
 const REGIONAL_W = 1.1;
 const NOISE_SCALE = 0.11;
 
@@ -119,7 +122,6 @@ export function computeDay(state: GameState, day: number, opts: DayOptions): Day
   const weekIdx = state.meta.weekIndex;
   const stations = activeStations(state);
   const S = stations.length;
-  const eIdx = eraIndex(state.meta.era);
   const noiseSd = P.noiseSd * NOISE_SCALE * difficultyMult(state, 'noise');
   const schedules = opts.schedules ?? state.schedules;
 
@@ -161,7 +163,7 @@ export function computeDay(state: GameState, day: number, opts: DayOptions): Day
     station: number;
   }
   const puCache = new Map<string, PU>();
-  const powerW = STATION_POWER_W * (1 - 0.1 * eIdx);
+  const powerW = STATION_POWER_W;
   const stationTermBase = stations.map((st) => powerW * st.power + (st.brand - 1) * 0.8 + (st.kind === 'pay' ? Math.log(Math.max(0.01, st.reach)) : 0) + stationModUtility(state, st, beta));
 
   const live = new Map<string, string[]>();
@@ -251,7 +253,7 @@ export function computeDay(state: GameState, day: number, opts: DayOptions): Day
     if (s.startsWith('maduro')) return -0.25;
     return P.youngOutside * 0.2;
   });
-  const rIn = 0.82 - 0.02 * eIdx;
+  const rIn = RETENTION_IN;
   const rBase = P.retentionBase;
 
   for (const mIdx of marketsIdx) {

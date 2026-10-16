@@ -47,6 +47,10 @@ export async function createDemoBackend(): Promise<Backend> {
     store.dirty.clear();
     for (const t of dirty) await idbSet(`tbl:${t}`, store.tables.get(t) ?? []);
   };
+  // v2.1: o jogo tem só a era atual; partidas de outras eras salvas neste navegador são apagadas
+  const oldGames = (store.tables.get('games') ?? []).filter((g) => g.era_id !== 'now').map((g) => String(g.id));
+  for (const id of oldGames) await store.deleteGame(id);
+  if (oldGames.length) await persist();
   const ctx = (): HandlerCtx => ({
     store,
     llm: null,

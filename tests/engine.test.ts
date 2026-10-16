@@ -18,8 +18,8 @@ import type { GameState } from '../supabase/functions/_shared/engine/types.ts';
 
 const INPUT: NewGameInput = {
   universe: 'real',
-  era: '90s',
-  startYear: 1996,
+  era: 'now',
+  startYear: 2026,
   scenario: 'emissora_crise',
   difficulty: 'diretor',
   seed: 4242,
@@ -132,20 +132,18 @@ test('baralho de eventos tem volume mínimo e opções válidas', () => {
   assert.ok(Object.keys(GENRES).length >= 25);
 });
 
-test('todas as eras e cenários criam partidas jogáveis', () => {
-  const eras = [['80s', 1985], ['90s', 1994], ['00s', 2004], ['10s', 2014], ['now', 2026]] as const;
-  for (const [era, year] of eras) {
-    for (const scenario of ['lider_ameacada', 'vice_ambiciosa', 'emissora_crise', 'rede_nova', 'canal_pago'] as const) {
-      if (scenario === 'canal_pago' && era === '80s') continue;
-      for (const universe of ['real', 'fictional'] as const) {
-        if (universe === 'real' && (scenario === 'lider_ameacada' || scenario === 'vice_ambiciosa')) continue;
-        const s = newGame({ ...INPUT, era, startYear: year, scenario, universe, seed: 7 }).state;
-        clearEvents(s);
-        applyIntent(s, { type: 'fill_empty' });
-        const out = simulate(s, 'week');
-        assert.ok(out.weekClosed, `${era}/${scenario}/${universe}`);
-        assert.ok((playerStation(s).history.at(-1)?.pts24 ?? 0) > 0, `${era}/${scenario}/${universe} sem audiência`);
-      }
+test('todos os cenários da era atual criam partidas jogáveis', () => {
+  for (const scenario of ['lider_ameacada', 'vice_ambiciosa', 'emissora_crise', 'rede_nova', 'canal_pago'] as const) {
+    for (const universe of ['real', 'fictional'] as const) {
+      if (universe === 'real' && (scenario === 'lider_ameacada' || scenario === 'vice_ambiciosa')) continue;
+      const s = newGame({ ...INPUT, scenario, universe, seed: 7 }).state;
+      assert.equal(s.meta.era, 'now');
+      assert.equal(s.meta.date.slice(0, 4), '2026');
+      clearEvents(s);
+      applyIntent(s, { type: 'fill_empty' });
+      const out = simulate(s, 'week');
+      assert.ok(out.weekClosed, `${scenario}/${universe}`);
+      assert.ok((playerStation(s).history.at(-1)?.pts24 ?? 0) > 0, `${scenario}/${universe} sem audiência`);
     }
   }
 });

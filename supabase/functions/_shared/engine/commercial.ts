@@ -170,7 +170,7 @@ export function airingEconomics(
   const adMinutes = st.isPlayer ? state.finance.adMinutes : 12;
   const spots = adMinutes * 2 * hours;
   let price = effectivePrice(state, st, p);
-  if (g.kids && (state.meta.era === '10s' || state.meta.era === 'now')) price *= 0.55;
+  if (g.kids) price *= 0.55; // restrição à publicidade infantil
   if (st.kind === 'pay') price *= 1;
   out.adRevenue = spots * price * occ * (1 - disc) * dayAdMult;
   if (p.merchLevel > 0) out.merch = p.merchLevel * price * 1.1 * Math.min(1, occ + 0.15) * Math.max(1, hours);

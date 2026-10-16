@@ -317,7 +317,7 @@ function applyMove(state: GameState, st: Station, m: PendingRivalMove, rng: Rng)
       return { text: textFor('cortar_custos', st, m.band, m.dayType, np, worst, null), public: true };
     }
     case 'arrendar_faixa': {
-      const g: GenreId = rng.chance(0.6) || state.meta.era === '80s' ? 'religioso' : 'televendas';
+      const g: GenreId = rng.chance(0.6) ? 'religioso' : 'televendas';
       const np = newRivalProgram(state, st, g, rng, 120, 0);
       const week = state.schedules[st.id];
       for (const d of [0, 1, 2, 3, 4]) {

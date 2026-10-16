@@ -75,14 +75,14 @@ export const GENRES: Record<GenreId, GenreDef> = {
     fit: [0.1, 0.1, 0.3, 0.45, 0.85, 0.75, 0.4, 0.25],
     profile: p(0.55, 0.85, 0.9, 0.3, 0.35, 0.2, 0.3),
     fatiguePerEp: 0.15, cost: [120000, 350000], dur: [45, 30, 60], episodes: [150, 250],
-    commercial: 55, rating: 'L', curve: 'novela', eras: ['90s', '00s', '10s', 'now'], marketable: true,
+    commercial: 55, rating: 'L', curve: 'novela', marketable: true,
   },
   novela_biblica: {
     id: 'novela_biblica', name: 'Novela bíblica', icon: '📜', color: '#d97706', group: 'drama',
     fit: [0.05, 0.05, 0.2, 0.3, 0.4, 0.75, 0.85, 0.5],
     profile: p(0.3, 0.25, 0.6, 0.3, 0.75, 0.5, 0.95),
     fatiguePerEp: 0.14, cost: [300000, 1000000], dur: [60, 45, 75], episodes: [80, 160],
-    commercial: 55, rating: '12', curve: 'novela', eras: ['10s', 'now'], marketable: true,
+    commercial: 55, rating: '12', curve: 'novela', marketable: true,
   },
   serie_nacional: {
     id: 'serie_nacional', name: 'Série / minissérie', icon: '🎬', color: '#a78bfa', group: 'drama',
@@ -119,7 +119,7 @@ export const GENRES: Record<GenreId, GenreDef> = {
     fit: [0.15, 0.05, 0.15, 0.2, 0.3, 0.5, 0.85, 1.0],
     profile: p(0.25, 0.95, 0.9, 0.75, 0.85, 0.35, 0.55),
     fatiguePerEp: 0.25, cost: [300000, 1200000], dur: [60, 30, 90], episodes: [60, 100],
-    commercial: 85, rating: '14', curve: 'reality', eras: ['00s', '10s', 'now'], marketable: true,
+    commercial: 85, rating: '14', curve: 'reality', marketable: true,
   },
   talk_show: {
     id: 'talk_show', name: 'Talk show', icon: '🛋️', color: '#818cf8', group: 'variedade',
@@ -231,7 +231,7 @@ export const GENRES: Record<GenreId, GenreDef> = {
     fit: [0.1, 0.05, 0.2, 0.3, 0.45, 0.6, 0.85, 0.8], sat: { nobre: 0.95 }, sun: { nobre: 0.95 },
     profile: p(0.45, 0.85, 0.8, 0.75, 0.8, 0.6, 0.7),
     fatiguePerEp: 0.35, cost: [300000, 1000000], dur: [90, 60, 150], episodes: [12, 20],
-    commercial: 80, rating: 'L', curve: 'reality', eras: ['00s', '10s', 'now'], marketable: true,
+    commercial: 80, rating: 'L', curve: 'reality', marketable: true,
   },
   janela_local: {
     id: 'janela_local', name: 'Janela local (afiliadas)', icon: '📍', color: '#475569', group: 'sistema',

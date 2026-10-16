@@ -65,7 +65,7 @@ export function Comercial({ gameId, state }: ScreenProps) {
             {active && <Button variant="primary" disabled={!dirty} busy={busy} onClick={save}>Salvar política</Button>}
           </div>
         </Card>
-        <Card title={`Receita x custo semanal (${era === '80s' ? 'R$ mi de 2026' : 'R$ mi'})`}>
+        <Card title="Receita x custo semanal (R$ mi)">
           <div className="h-60">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chart} margin={{ left: -12, right: 6, top: 6, bottom: 0 }}>

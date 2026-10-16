@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* Tokens do tema: cada era muda cores e tipografia (seção 20), a disposição das telas é a mesma. */
+/* Tokens do tema da era atual (2026). */
 :root {
   --bg: #0b0b12;
   --surface: #14141f;
@@ -19,70 +19,6 @@
   --font-body: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --radius: 14px;
   color-scheme: dark;
-}
-
-/* Anos 80: papel, telex e luz âmbar */
-:root[data-era='80s'] {
-  --bg: #15110b;
-  --surface: #211b12;
-  --surface-2: #2b2418;
-  --surface-3: #3a3020;
-  --border: #4a3e2a;
-  --text: #f4ead6;
-  --muted: #b9a888;
-  --accent: #f59e0b;
-  --accent-contrast: #1a1205;
-  --accent-2: #fb7185;
-  --font-display: 'Courier New', Courier, ui-monospace, monospace;
-  --radius: 6px;
-}
-
-/* Anos 90: monitor CRT */
-:root[data-era='90s'] {
-  --bg: #070d1a;
-  --surface: #0d1628;
-  --surface-2: #132037;
-  --surface-3: #1b2b48;
-  --border: #22365a;
-  --text: #e6f1ff;
-  --muted: #8fa6c8;
-  --accent: #22d3ee;
-  --accent-contrast: #04151a;
-  --accent-2: #f472b6;
-  --font-display: 'Trebuchet MS', Verdana, ui-sans-serif, sans-serif;
-  --radius: 8px;
-}
-
-/* Anos 2000: notebook prateado */
-:root[data-era='00s'] {
-  --bg: #0e1116;
-  --surface: #171b22;
-  --surface-2: #1f252e;
-  --surface-3: #2a313c;
-  --border: #353e4b;
-  --text: #eef2f7;
-  --muted: #a0abba;
-  --accent: #60a5fa;
-  --accent-contrast: #06121f;
-  --accent-2: #a3e635;
-  --font-display: Tahoma, 'Segoe UI', ui-sans-serif, sans-serif;
-  --radius: 10px;
-}
-
-/* Anos 2010: segunda tela */
-:root[data-era='10s'] {
-  --bg: #0c0b14;
-  --surface: #15131f;
-  --surface-2: #1e1b2c;
-  --surface-3: #2a263d;
-  --border: #353049;
-  --text: #f1eefb;
-  --muted: #a8a1c4;
-  --accent: #a78bfa;
-  --accent-contrast: #140c2a;
-  --accent-2: #2dd4bf;
-  --font-display: 'Helvetica Neue', Helvetica, Arial, ui-sans-serif, sans-serif;
-  --radius: 12px;
 }
 
 @theme {
@@ -158,16 +94,6 @@ h3,
 
 .safe-top {
   padding-top: env(safe-area-inset-top);
-}
-
-/* textura de scanline sutil nos anos 90 */
-:root[data-era='90s'] .crt::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.025) 0 1px, transparent 1px 3px);
-  border-radius: inherit;
 }
 
 .blink {

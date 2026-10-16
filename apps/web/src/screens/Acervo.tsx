@@ -172,12 +172,11 @@ function Market({ gameId, state }: ScreenProps) {
                 {active && (
                   o.kind === 'leilao' ? (
                     <div className="flex gap-2">
-                      <input className={inputClass} inputMode="decimal" placeholder={`Lance em milhões (${era === '80s' ? 'R$ de 2026' : 'R$ da época'})`} value={bid} onChange={(e) => setBid(e.target.value)} />
+                      <input className={inputClass} inputMode="decimal" placeholder="Lance em milhões de R$" value={bid} onChange={(e) => setBid(e.target.value)} />
                       <Button variant="primary" busy={busy} onClick={() => {
                         const v = parseFloat(bid.replace(',', '.'));
                         if (!isFinite(v) || v <= 0) return toast('error', 'Digite o valor em milhões.');
-                        const idx = state.meta.era === '80s' ? 1 : { '90s': 0.15, '00s': 0.35, '10s': 0.6, now: 1 }[state.meta.era];
-                        void buy(o, (v * 1e6) / idx);
+                        void buy(o, v * 1e6);
                       }}>Dar lance</Button>
                     </div>
                   ) : (

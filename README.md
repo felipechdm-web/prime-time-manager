@@ -2,7 +2,8 @@
 
 Simulador de Diretor de Programação de TV aberta no Brasil, feito a partir do *Documento-Mestre*.
 Você monta a grade, responde a crises, negocia com a diretoria e com anunciantes, enfrenta os rivais
-e é avaliado(a) pela presidência — dos anos 80 até hoje. Joga-se no navegador, no PC e no celular.
+e é avaliado(a) pela presidência. A partida começa em janeiro de 2026, no mercado de TV de hoje, e segue
+pelos anos seguintes. Joga-se no navegador, no PC e no celular.
 
 > **Para colocar no ar com Supabase + GitHub, siga o [TUTORIAL.md](TUTORIAL.md).**
 
@@ -12,11 +13,11 @@ e é avaliado(a) pela presidência — dos anos 80 até hoje. Joga-se no navegad
 
 | Camada | Onde | O que faz |
 |---|---|---|
-| Motor | `supabase/functions/_shared/engine/` | TypeScript puro e determinístico (semente por partida). Audiência por faixa de 15 min em 15 praças (PNT), 7 segmentos de público, herança, hábito, buzz, fadiga, fuga para o digital; comercial (CPP, ocupação, descontos, cotas, merchandising, arrendamento); rivais com arquétipos; baralho de 95 eventos com arcos; KPIs, fechamentos e carreira. |
+| Motor | `supabase/functions/_shared/engine/` | TypeScript puro e determinístico (semente por partida). Audiência por faixa de 15 min em 15 praças (PNT), 7 segmentos de público, herança, hábito, buzz, fadiga, fuga para o digital; comercial (CPP, ocupação, descontos, cotas, merchandising, arrendamento); rivais com arquétipos; baralho de 77 eventos com arcos; KPIs, fechamentos e carreira. |
 | Mestre | `supabase/functions/_shared/game/` | Chama a Claude API (saída estruturada em JSON, validada com Zod e com uma tentativa de correção). Remove frases com números inventados, limita efeitos propostos (humor ±15, confiança ±10, buzz ±10, reputação ±3) e trata o texto livre do jogador como dado. Sem chave ou sem crédito, usa textos padrão e o jogo continua. |
-| Funções | `supabase/functions/<nome>/` | 7 Edge Functions (Deno): `create-game`, `apply-intent`, `simulate-week`, `mestre-scene`, `resolve-event`, `live-mode`, `interpret-free-action`. Conferem o login, carregam o estado, rodam o motor, gravam com trava de versão e devolvem só o que mudou. |
+| Funções | `supabase/functions/<nome>/` | 8 Edge Functions (Deno): `create-game`, `apply-intent`, `simulate-week`, `mestre-scene`, `resolve-event`, `live-mode`, `interpret-free-action` e `catalog-admin` (Editor de Catálogo). Conferem o login, carregam o estado, rodam o motor, gravam com trava de versão e devolvem só o que mudou. |
 | Banco | `supabase/setup_completo.sql` | Postgres com RLS: cada jogador só lê as próprias partidas; o site só **lê** as tabelas do jogo e toda escrita passa pelas funções. |
-| Site | `apps/web/` | React 19 + Vite + Tailwind. Navegação lateral no PC e inferior no celular; grade com arrastar e soltar (PC) e toque no horário (celular); visual que muda com a era. Instalável na tela inicial (PWA). |
+| Site | `apps/web/` | React 19 + Vite + Tailwind. Navegação lateral no PC e inferior no celular; grade com arrastar e soltar (PC) e toque no horário (celular); Editor de Catálogo para os títulos reais. Instalável na tela inicial (PWA). |
 
 A chave da Claude API fica **só** nos Secrets das Edge Functions do Supabase. Ela nunca vai para o GitHub nem para o site.
 
@@ -47,7 +48,7 @@ Outros comandos (na pasta raiz):
 | `npm test` | Testes do motor e das funções (sem IA, com banco em memória). |
 | `npm run typecheck` | Checagem de tipos do site. |
 | `npm run build` | Gera o site em `apps/web/dist`. |
-| `npm run calibrate` | Simula várias temporadas por era e confere as faixas de audiência e receita. |
+| `npm run calibrate` | Simula várias temporadas de 2026 e confere as faixas de audiência e receita. |
 | `npm run events-stats` | Frequência e tom dos eventos ao longo de anos simulados. |
 | `npm run custo` | Custo da IA numa semana-padrão de jogo, v1 x v2 (sem chamar a API). |
 | `npm run gen-seed` | Regenera `supabase/seed.sql` e `supabase/setup_completo.sql` a partir dos catálogos. |
@@ -60,7 +61,8 @@ prime-time-manager/
 ├─ supabase/
 │  ├─ functions/              Edge Functions + _shared (motor, Mestre, servidor)
 │  ├─ migrations/             esquema do banco
-│  ├─ seed.sql                catálogos (eras, gêneros, praças, eventos)
+│  ├─ seed.sql                catálogos (era atual, gêneros, praças, eventos)
+│  ├─ seeds/                  lotes do catálogo real (títulos, players, grades, direitos)
 │  ├─ setup_completo.sql      esquema + catálogos numa colada só (gerado)
 │  └─ config.toml             deploy das funções (verify_jwt desligado: o login é conferido no código)
 ├─ prompts/mestre.v1.md       prompt de sistema do Mestre
@@ -71,8 +73,9 @@ prime-time-manager/
 
 ## Decisões de implementação
 
-- **Dinheiro**: o motor guarda valores em R$ de 2026 e a tela converte pela inflação de cada era, para que os
-  valores pareçam da época sem distorcer a matemática entre eras.
+- **Uma era só (v2.1, 17/10/2026)**: o jogo tem apenas a era atual. As eras de 1983 a 2019 foram retiradas
+  (catálogo, eventos, temas visuais e a transição entre eras); o motor continua lendo os parâmetros da era, agora
+  com um único conjunto. Os números de 2026 ficaram idênticos aos de antes da mudança. Valores em R$ de 2026.
 - **Modelos (v2, seção 17.5)**: todas as funções usam `claude-haiku-5-5` com esforço baixo e raciocínio desligado;
   cada função tem o seu `max_tokens` (`supabase/functions/_shared/game/llmConfig.ts`). O Sonnet 5.5 fica como
   modo premium desligado (`LLM_PREMIUM=on` liga, só na avaliação com a presidência). Tudo pode ser trocado por

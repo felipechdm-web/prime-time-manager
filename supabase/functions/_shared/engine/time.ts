@@ -169,17 +169,8 @@ interface CopaDef {
   realStage: number; // até onde o Brasil foi na vida real: 3=oitavas,4=quartas,5=semi,6=final(perdeu),7=campeão
 }
 
+// a partida começa em 2026 e segue em frente, então só entram as Copas a partir dela
 export const COPAS: Record<number, CopaDef> = {
-  1986: { start: '1986-05-31', end: '1986-06-29', hours: ['16:00', '12:00'], realStage: 4 },
-  1990: { start: '1990-06-08', end: '1990-07-08', hours: ['16:00', '12:00'], realStage: 3 },
-  1994: { start: '1994-06-17', end: '1994-07-17', hours: ['17:00', '20:30'], realStage: 7 },
-  1998: { start: '1998-06-10', end: '1998-07-12', hours: ['16:00', '12:30'], realStage: 6 },
-  2002: { start: '2002-05-31', end: '2002-06-30', hours: ['06:00', '08:30'], realStage: 7 },
-  2006: { start: '2006-06-09', end: '2006-07-09', hours: ['16:00', '11:00'], realStage: 4 },
-  2010: { start: '2010-06-11', end: '2010-07-11', hours: ['15:30', '11:00'], realStage: 4 },
-  2014: { start: '2014-06-12', end: '2014-07-13', hours: ['17:00', '16:00'], realStage: 5 },
-  2018: { start: '2018-06-14', end: '2018-07-15', hours: ['15:00', '11:00'], realStage: 4 },
-  2022: { start: '2022-11-20', end: '2022-12-18', hours: ['16:00', '12:00'], realStage: 4 },
   2026: { start: '2026-06-11', end: '2026-07-19', hours: ['19:00', '16:00'], realStage: 0 },
   2030: { start: '2030-06-13', end: '2030-07-21', hours: ['16:00', '13:00'], realStage: 0 },
   2034: { start: '2034-06-15', end: '2034-07-23', hours: ['13:00', '10:00'], realStage: 0 },
@@ -213,27 +204,24 @@ export function isCopaYear(year: number): boolean {
   return !!COPAS[year];
 }
 
-// ===== Eleições =====
+// ===== Eleições (regras a partir de 2026: eleição a cada 2 anos, gerais em 2026, 2030...) =====
 export function isElectionYear(year: number): boolean {
-  return year >= 1986 && (year % 2 === 0 || year === 1989);
+  return year % 2 === 0;
 }
 
 export function isGeneralElection(year: number): boolean {
-  return year === 1989 || (year >= 1994 && (year - 1994) % 4 === 0) || year === 1986 || year === 1990;
+  return (year - 2026) % 4 === 0;
 }
 
 export function electionDate(year: number): string {
-  if (year === 1989) return '1989-11-15';
-  if (year < 1994) return nthWeekdayOfMonth(year, 11, 0, 3);
   return nthWeekdayOfMonth(year, 10, 0, 1);
 }
 
-// período de HGPE: ~45 dias antes (35 a partir de 2016)
+// período de HGPE: 35 dias antes da eleição
 export function hgpeWindow(year: number): { from: string; to: string } | null {
   if (!isElectionYear(year)) return null;
   const el = electionDate(year);
-  const days = year >= 2016 ? 35 : 45;
-  return { from: addDays(el, -days), to: addDays(el, -3) };
+  return { from: addDays(el, -35), to: addDays(el, -3) };
 }
 
 export function inHgpe(iso: string): boolean {
@@ -245,10 +233,6 @@ export function inHgpe(iso: string): boolean {
 // ===== Sazonalidade =====
 export const TLE_SEASON = [0.92, 0.95, 1.0, 1.0, 1.02, 1.04, 0.95, 1.02, 1.0, 1.0, 0.98, 0.95];
 export const AD_SEASON = [0.78, 0.85, 0.98, 1.0, 1.08, 1.0, 0.95, 1.0, 1.0, 1.03, 1.06, 1.15];
-
-export function inPandemic(iso: string): boolean {
-  return iso >= '2020-03-16' && iso <= '2020-08-31';
-}
 
 export interface DayCalendar {
   date: string;
@@ -263,7 +247,7 @@ export function dayCalendar(iso: string): DayCalendar {
   const month = monthOf(iso);
   let tle = TLE_SEASON[month - 1];
   let ad = AD_SEASON[month - 1];
-  if (month === 11 && year >= 2010) ad *= 1.04; // Black Friday
+  if (month === 11) ad *= 1.04; // Black Friday
   const tags: string[] = [];
   let prime = 1;
   const carn = carnivalTuesday(year);
@@ -290,11 +274,6 @@ export function dayCalendar(iso: string): DayCalendar {
   if (isElectionYear(year) && iso === electionDate(year)) {
     prime *= 1.15;
     tags.push('apuracao');
-  }
-  if (inPandemic(iso)) {
-    tle *= 1.15;
-    ad *= 0.75;
-    tags.push('pandemia');
   }
   return { date: iso, tleMult: tle, adMult: ad, tags, primeMult: prime };
 }

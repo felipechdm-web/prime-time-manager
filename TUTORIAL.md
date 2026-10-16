@@ -19,10 +19,13 @@ guarda o código, publica as funções no Supabase e hospeda o site (GitHub Page
 ## 2. Criar as tabelas (uma colada só)
 1. No menu lateral, abra **SQL Editor** → **New query**.
 2. Abra o arquivo `supabase/setup_completo.sql` deste projeto (no Bloco de Notas, por exemplo), copie **tudo** e cole no editor.
-3. Clique em **Run**. Deve aparecer "Success". (Pode rodar de novo sem problema: ele só atualiza o catálogo.)
-4. Confira em **Table Editor** (schema `public`). O script cria **23 tabelas** — é normal aparecerem todas:
-   - **Catálogo do jogo** (já vêm preenchidas): `eras` (5 linhas), `era_rules` (32), `genres` (29), `event_templates` (95),
-     `markets` (15), `station_archetypes` e `npc_archetypes`. Basta conferir essas contagens.
+3. Clique em **Run**. Deve aparecer "Success". (Pode rodar de novo sem problema: ele atualiza o catálogo e preserva
+   as partidas de 2026. O jogo tem só a era atual; partidas antigas de outras eras, se existirem, são apagadas.)
+4. Confira em **Table Editor** (schema `public`). O script cria **29 tabelas** — é normal aparecerem todas:
+   - **Catálogo do jogo** (já vêm preenchidas): `eras` (1 linha: a era atual, 2026), `era_rules` (8), `genres` (29),
+     `event_templates` (77), `markets` (15), `station_archetypes` e `npc_archetypes`. Basta conferir essas contagens.
+   - **Catálogo real** (começam vazias e recebem os lotes de títulos reais): `rights_holders`, `catalog_titles`,
+     `schedule_templates`, `historical_rights`, `clubs` e `club_fanbase`.
    - **Dados das partidas** (começam **vazias** e se enchem quando você joga): `games`, `reports`, `inbox_messages`,
      `conversations`, `messages`, `npc_memories`, `events_log`, `ratings_slots`, `ratings_minute`, `weekly_stats`,
      `finance_ledger`, `competitor_actions`, `kpi_snapshots`, `campaign_summaries`, `player_intents` e `llm_calls`

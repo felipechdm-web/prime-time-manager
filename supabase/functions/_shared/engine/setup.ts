@@ -231,7 +231,6 @@ function genreOk(ctx: Ctx, st: Station, g: GenreId): boolean {
   if (!genreAvailable(g, ctx.era)) return false;
   const P = ERAS[ctx.era].params;
   if (g === 'infantil' && P.kidsTV < 0.6 && st.archetype !== 'publica_educativa') return false;
-  if (g === 'televendas' && ctx.era === '80s') return false;
   if (g === 'futebol' && !st.footballUntilYear) return false;
   return true;
 }
@@ -744,7 +743,6 @@ export function setupCopaYear(state: GameState, year: number): void {
       continue;
     }
     if (st.archetype === 'hegemonica') state.flags[`copa_${year}_${st.id}`] = true;
-    if (st.archetype === 'jornalistica_esportiva' && year >= 1990 && year <= 2018) state.flags[`copa_${year}_${st.id}`] = true;
   }
 }
 

@@ -1,6 +1,6 @@
-// Ajuda: como jogar, regras principais, eras e glossário.
+// Ajuda: como jogar, regras principais, o mercado de 2026 e glossário.
 
-import { ERAS, ERA_ORDER, rulesFor } from '@engine/catalog/eras.ts';
+import { ERAS, rulesFor } from '@engine/catalog/eras.ts';
 import { GLOSSARY } from '@game/fallbackScenes.ts';
 import type { GameState } from '@engine/types.ts';
 import { go } from '../lib/router.ts';
@@ -16,7 +16,7 @@ export function HelpPage() {
 }
 
 export function HelpContent({ state }: { state?: GameState }) {
-  const era = state ? ERAS[state.meta.era] : null;
+  const era = ERAS[state?.meta.era ?? 'now'];
   return (
     <div className="mx-auto max-w-4xl space-y-4">
       <h1 className="text-2xl font-black">Como jogar</h1>
@@ -42,7 +42,7 @@ export function HelpContent({ state }: { state?: GameState }) {
             <li><b>Herança</b>: parte do público do programa anterior fica. Gêneros parecidos em sequência seguram mais.</li>
             <li><b>Buzz</b> (chamadas, imprensa) sobe; <b>fadiga</b> (desgaste, reprises) derruba.</li>
             <li><b>Concorrência</b>: o público escolhe entre todas as emissoras e as outras telas. Contraprogramar pega quem não gosta do líder.</li>
-            <li>Um pouco de <b>sorte</b> diária, maior nas eras modernas.</li>
+            <li>Um pouco de <b>sorte</b> diária: com o público fragmentado em várias telas, a audiência oscila de um dia para o outro.</li>
           </ul>
         </Card>
         <Card title="Dinheiro">
@@ -61,19 +61,14 @@ export function HelpContent({ state }: { state?: GameState }) {
           <li>Faixa vazia, programa encerrado na grade, cota vendida sem programa e decisões obrigatórias pendentes bloqueiam o "Colocar no ar".</li>
           <li>Telejornal principal e janelas locais das afiliadas são protegidos (🔒).</li>
           <li>Horário eleitoral (anos de eleição) entra por cima da grade às 13h e 20h30, de segunda a sábado.</li>
-          {(era ? rulesFor(era.id) : rulesFor('now')).filter((r) => r.key === 'rating_hours').map((r) => <li key={r.key}>{r.text}</li>)}
+          {rulesFor(era.id).filter((r) => r.key === 'rating_hours').map((r) => <li key={r.key}>{r.text}</li>)}
         </ul>
       </Card>
 
-      <Card title="As eras">
-        <div className="space-y-2 text-sm">
-          {ERA_ORDER.map((id) => (
-            <details key={id} open={era?.id === id}>
-              <summary className="cursor-pointer font-semibold">{ERAS[id].name} — {ERAS[id].tagline}</summary>
-              <p className="mt-1 text-muted">{ERAS[id].summary}</p>
-              <p className="mt-1 text-xs text-muted">{ERAS[id].currencyNote}</p>
-            </details>
-          ))}
+      <Card title={`O mercado: ${era.name} — ${era.tagline}`}>
+        <div className="space-y-1 text-sm">
+          <p className="text-muted">{era.summary}</p>
+          <p className="text-xs text-muted">{era.currencyNote} A partida começa na primeira semana de janeiro de 2026 e segue pelos anos seguintes.</p>
         </div>
       </Card>
 

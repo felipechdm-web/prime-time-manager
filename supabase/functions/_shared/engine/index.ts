@@ -3,7 +3,7 @@
 export * from './types.ts';
 export * from './time.ts';
 export * from './money.ts';
-export { ERAS, ERA_ORDER, ERA_RULES, REAL_STATIONS, eraForYear, rulesFor } from './catalog/eras.ts';
+export { ERAS, ERA_ORDER, ERA_RULES, REAL_STATIONS, rulesFor } from './catalog/eras.ts';
 export type { EraDef, EraParams, EraRule, RealStationDef } from './catalog/eras.ts';
 export { GENRES, GENRE_LIST, PLAYABLE_GENRES, genreAvailable, genreFit } from './catalog/genres.ts';
 export type { GenreDef } from './catalog/genres.ts';

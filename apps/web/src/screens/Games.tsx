@@ -78,7 +78,7 @@ export function Games({ backend, user, onSwitchMode }: { backend: Backend; user:
       ) : games.error ? (
         <Empty title="Não foi possível carregar as partidas">{String((games.error as Error).message)}</Empty>
       ) : !games.data?.length ? (
-        <Empty title="Nenhuma partida ainda">Comece pela entrevista de contratação: escolha universo, era, emissora e cenário.</Empty>
+        <Empty title="Nenhuma partida ainda">Comece pela entrevista de contratação: escolha universo, emissora e cenário. Toda partida começa em janeiro de 2026.</Empty>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
           {games.data.map((g) => {

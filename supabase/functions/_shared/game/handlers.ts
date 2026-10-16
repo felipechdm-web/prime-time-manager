@@ -140,17 +140,16 @@ function str(v: unknown, max = 60): string {
 // ===== create-game =====
 export async function createGame(ctx: HandlerCtx, body: Record<string, unknown>): Promise<{ gameId: string; interview: MestreOutput }> {
   const universe = body.universe === 'fictional' ? 'fictional' : 'real';
-  const era = body.era as EraId;
-  if (!ERAS[era]) throw new HttpError(400, 'Era inválida');
-  const startYear = Number(body.startYear) || ERAS[era].playableYears[0];
-  if (!ERAS[era].playableYears.includes(startYear)) throw new HttpError(400, 'Ano inicial fora da era');
+  // v2.1: o jogo tem só a era atual; toda partida começa em janeiro de 2026
+  const era: EraId = 'now';
+  if (body.era !== undefined && body.era !== era) throw new HttpError(400, 'O jogo agora tem só a era atual (2026).');
+  const startYear = ERAS[era].playableYears[0];
+  if (body.startYear !== undefined && Number(body.startYear) !== startYear) throw new HttpError(400, `Toda partida começa em ${startYear}.`);
   const scenario = body.scenario as ScenarioId;
   if (!SCENARIOS[scenario]) throw new HttpError(400, 'Cenário inválido');
-  if (scenario === 'canal_pago' && era === '80s') throw new HttpError(400, 'Não existe TV paga nos anos 80');
   const difficulty = (['estagiario', 'diretor', 'lenda'].includes(String(body.difficulty)) ? body.difficulty : 'diretor') as Difficulty;
   const player = (body.player ?? {}) as Record<string, unknown>;
   const background = (['jornalista', 'publicitario', 'produtor_auditorio', 'herdeiro', 'streaming'].includes(String(player.background)) ? player.background : 'jornalista') as Background;
-  if (background === 'streaming' && era !== 'now') throw new HttpError(400, 'Executivo de streaming só existe na era atual');
   const station = (body.station ?? {}) as Record<string, unknown>;
   const mode = station.mode === 'real' && universe === 'real' ? 'real' : 'fictional';
   if (universe === 'real' && mode === 'fictional' && (scenario === 'lider_ameacada' || scenario === 'vice_ambiciosa')) {

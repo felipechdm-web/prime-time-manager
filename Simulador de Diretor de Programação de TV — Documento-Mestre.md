@@ -1772,6 +1772,7 @@ Felipe tomou as decisões abaixo em 15/10/2026; elas valem para a v1 e não deve
 | Conteúdo (v2) | Grades, acervos e mercado com títulos reais, equilibrados com fictícios onde a história não alcança (seção 8A) |
 | Compra de direitos (v2) | Mesa de Negociação em chat com representantes fictícios de empresas reais; o motor decide preços e aceite (seção 8B) |
 | Esporte (v2) | Competições reais na grade, no acervo e no mercado, com audiência por praça e torcidas (seção 8C) |
+| Eras (v2.1, 17/10/2026) | Só a era atual (2026). As eras de 1983 a 2019 saem do jogo; as seções que tratam delas ficam como referência histórica |
 
 - [ ] Definir o valor do teto mensal da API (sugestão inicial: US$ 20/mês; ver estimativa na seção 17.4)
 

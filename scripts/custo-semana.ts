@@ -57,7 +57,7 @@ const as = async <T>(fn: LLMFunction, run: () => Promise<T>) => { currentFn = fn
 
 // ===== a semana-padrão =====
 const { gameId } = await as('create-game', () => createGame(ctx, {
-  universe: 'real', era: '90s', startYear: 1995, scenario: 'emissora_crise', difficulty: 'diretor',
+  universe: 'real', era: 'now', startYear: 2026, scenario: 'emissora_crise', difficulty: 'diretor',
   player: { name: 'Felipe', background: 'jornalista', pronoun: 'o' }, station: { mode: 'fictional', name: 'TV Horizonte' }, seed: 20261016,
 }));
 const createGameRecs = recs.length;

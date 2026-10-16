@@ -37,10 +37,12 @@ test('validação: converte texto do CSV/formulário e acusa erros por campo', (
     assert.ok(msg.includes(part), `esperava erro sobre ${part}: ${msg}`);
   }
   // colunas ausentes não entram (importação sem "approved" não mexe na aprovação)
-  const partial = normalizeCatalogRow('rights_holders', { id: 'televisa', name: 'TelevisaUnivision', category: 'novela_latina', eras: 'now|90s', confidence: 'alta' });
+  const partial = normalizeCatalogRow('rights_holders', { id: 'televisa', name: 'TelevisaUnivision', category: 'novela_latina', eras: 'now', confidence: 'alta' });
   assert.deepEqual(partial.errors, []);
   assert.equal('approved' in partial.row, false);
-  assert.deepEqual(partial.row.eras, ['now', '90s']);
+  assert.deepEqual(partial.row.eras, ['now']);
+  // o jogo tem só a era atual: outras eras são recusadas
+  assert.ok(normalizeCatalogRow('rights_holders', { id: 'x', name: 'X', category: 'formato', eras: 'now|90s', confidence: 'alta' }).errors.some((e) => e.includes('90s')));
   assert.ok(normalizeCatalogRow('club_fanbase', { club_id: 'fla', market_id: 'XX', era_id: 'now', share: '1,5', confidence: 'alta' }).errors.length >= 2);
 });
 
@@ -104,11 +106,11 @@ test('catalog-admin: só o dono edita; valida antes de gravar; aprova, corrige e
   await catalogAdminHandler(admin, { action: 'save', table: 'rights_holders', rows: [{ id: 'televisa', name: 'TelevisaUnivision', category: 'novela_latina', eras: 'now', confidence: 'alta' }] });
   await catalogAdminHandler(admin, { action: 'approve', table: 'rights_holders', keys: [{ id: 'televisa' }], approved: true });
   // corrigir sem a coluna approved mantém a aprovação
-  await catalogAdminHandler(admin, { action: 'save', table: 'rights_holders', rows: [{ id: 'televisa', name: 'Televisa', category: 'novela_latina', eras: 'now|90s', confidence: 'alta' }] });
+  await catalogAdminHandler(admin, { action: 'save', table: 'rights_holders', rows: [{ id: 'televisa', name: 'Televisa', category: 'novela_latina', eras: 'now', confidence: 'alta' }] });
   const [h] = await store.select('rights_holders', { id: 'televisa' });
   assert.equal(h.name, 'Televisa');
   assert.equal(h.approved, true);
-  assert.deepEqual(h.eras, ['now', '90s']);
+  assert.deepEqual(h.eras, ['now']);
 
   // tabelas de id automático: linha sem id é inserida; com a chave natural, atualizada
   await catalogAdminHandler(admin, { action: 'save', table: 'historical_rights', rows: [{ era_id: 'now', product_ref: 'televisa', holder_station_key: 'sbt', confidence: 'alta' }] });

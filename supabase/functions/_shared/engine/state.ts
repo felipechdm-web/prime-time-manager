@@ -1,6 +1,6 @@
 // Acessores e utilidades sobre o GameState.
 
-import { ERAS, eraForYear } from './catalog/eras.ts';
+import { ERAS } from './catalog/eras.ts';
 import { GENRES } from './catalog/genres.ts';
 import type { EraParams } from './catalog/eras.ts';
 import type { GameState, Npc, NpcRole, Program, Station } from './types.ts';
@@ -96,15 +96,6 @@ export function politicalCapital(state: GameState): number {
 
 export function isPlayableGenre(g: string): boolean {
   return GENRES[g as keyof typeof GENRES]?.group !== 'sistema';
-}
-
-export function syncEra(state: GameState): boolean {
-  const era = eraForYear(currentYear(state));
-  if (era !== state.meta.era) {
-    state.meta.era = era;
-    return true;
-  }
-  return false;
 }
 
 export function pushTimeline(state: GameState, text: string, kind = 'info'): void {
