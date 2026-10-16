@@ -1,0 +1,19 @@
+{
+  "name": "prime-time-manager",
+  "private": true,
+  "type": "module",
+  "description": "Simulador de Diretor de Programação de TV (motor determinístico + Mestre de IA)",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "test": "node --test tests/engine.test.ts tests/handlers.test.ts",
+    "calibrate": "node scripts/calibrate.ts",
+    "events-stats": "node scripts/events-stats.ts",
+    "gen-seed": "node scripts/gen-seed.ts",
+    "web:install": "npm --prefix apps/web ci",
+    "dev": "npm --prefix apps/web run dev",
+    "build": "npm --prefix apps/web run build",
+    "typecheck": "npm --prefix apps/web run typecheck"
+  }
+}

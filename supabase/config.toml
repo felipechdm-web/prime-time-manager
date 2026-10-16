@@ -1,0 +1,26 @@
+# Configuração do Supabase CLI usada no deploy das Edge Functions (workflow deploy.yml ou terminal).
+# O banco é criado colando supabase/setup_completo.sql no SQL Editor (veja o TUTORIAL.md).
+project_id = "prime-time-manager"
+
+# O login é conferido dentro de cada função (auth.getUser com o token do jogador),
+# então o gateway não precisa exigir JWT. Isso também evita problemas com as chaves novas (publishable).
+[functions.create-game]
+verify_jwt = false
+
+[functions.apply-intent]
+verify_jwt = false
+
+[functions.simulate-week]
+verify_jwt = false
+
+[functions.mestre-scene]
+verify_jwt = false
+
+[functions.resolve-event]
+verify_jwt = false
+
+[functions.live-mode]
+verify_jwt = false
+
+[functions.interpret-free-action]
+verify_jwt = false

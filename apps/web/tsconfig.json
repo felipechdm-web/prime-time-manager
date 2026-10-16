@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "useDefineForClassFields": true,
+    "types": ["vite/client"],
+    "paths": {
+      "@engine/*": ["../../supabase/functions/_shared/engine/*"],
+      "@game/*": ["../../supabase/functions/_shared/game/*"]
+    }
+  },
+  "include": ["src", "../../supabase/functions/_shared/engine", "../../supabase/functions/_shared/game"]
+}

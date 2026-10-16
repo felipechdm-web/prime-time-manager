@@ -1,0 +1,19 @@
+# dependências e builds
+node_modules/
+dist/
+
+# segredos locais (a chave da Claude API vive só nos Secrets do Supabase)
+.env
+.env.*
+!.env.example
+supabase/.env
+supabase/.temp/
+supabase/.branches/
+
+# sistema e editores
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.log
