@@ -12,6 +12,7 @@ begin
   end if;
 end $$;
 
+
 begin;
 
 insert into public.rights_holders (id, name, category, eras, profile, representative_seed, confidence, notes, batch) values

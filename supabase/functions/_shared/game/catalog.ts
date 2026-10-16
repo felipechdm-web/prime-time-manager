@@ -37,7 +37,7 @@ const ERA_IDS = Object.keys(ERAS);
 const MARKET_CODES = MARKETS.map((m) => m.code);
 export const TITLE_KINDS = ['novela', 'serie', 'minisserie', 'filme', 'pacote_filmes', 'desenho', 'formato', 'reality', 'documentario', 'programa'];
 export const HOLDER_CATEGORIES = [
-  'novela_latina', 'novela_turca', 'asiatico', 'estudio_eua', 'formato', 'futebol_nacional', 'futebol_internacional', 'outros_esportes', 'produtora_br', 'emissora',
+  'novela_latina', 'novela_turca', 'asiatico', 'estudio_eua', 'formato', 'futebol_nacional', 'futebol_internacional', 'outros_esportes', 'produtora_br', 'emissora', 'infantil',
 ];
 
 const review: FieldDef[] = [

@@ -1,10 +1,12 @@
-// Monta o SQL e os CSV de um lote do catálogo real, validando tudo com as mesmas regras do Editor de Catálogo.
+// Monta o SQL e os CSV de cada lote do catálogo real, validando tudo com as mesmas regras do Editor de Catálogo.
 // Usado por scripts/gen-catalog-seed.ts (grava os arquivos) e pelos testes (só valida).
 
 import { GENRES } from '../functions/_shared/engine/catalog/genres.ts';
 import { catalogRowsToCSV, normalizeCatalogRow } from '../functions/_shared/game/catalog.ts';
 import type { CatalogTable } from '../functions/_shared/game/catalog.ts';
 import { BATCH, GRIDS, HOLDERS, REFERENCE_MONTH, RIGHTS, TITLES } from './catalogo_2026_lote1.ts';
+import type { GridSeed, HolderSeed, RightSeed, TitleSeed } from './catalogo_2026_lote1.ts';
+import * as L2A from './catalogo_2026_lote2a.ts';
 
 const ERA = 'now';
 
@@ -98,48 +100,95 @@ commit;
   return { problems, sql };
 }
 
+export interface BatchSeed {
+  batch: string;
+  source: string; // arquivo .ts de onde o lote vem (aparece no cabeçalho do SQL)
+  holders: HolderSeed[];
+  titles: TitleSeed[];
+  grids: GridSeed[];
+  rights: RightSeed[];
+  previous?: BatchSeed[]; // lotes anteriores: players e títulos deles podem ser referenciados, códigos não podem repetir
+}
+
 export function buildLote1(): BuiltSeed {
+  return buildBatch(LOTE1);
+}
+
+export function buildLote2a(): BuiltSeed {
+  return buildBatch(LOTE2A);
+}
+
+export const LOTE1: BatchSeed = { batch: BATCH, source: 'catalogo_2026_lote1.ts', holders: HOLDERS, titles: TITLES, grids: GRIDS, rights: RIGHTS };
+export const LOTE2A: BatchSeed = { batch: L2A.BATCH, source: 'catalogo_2026_lote2a.ts', holders: L2A.HOLDERS, titles: L2A.TITLES, grids: [], rights: L2A.RIGHTS, previous: [LOTE1] };
+
+export function buildBatch(seed: BatchSeed): BuiltSeed {
+  const BATCH = seed.batch;
   const problems: string[] = [];
   const check = (table: CatalogTable, label: string, raw: Record<string, unknown>) => {
     const n = normalizeCatalogRow(table, raw);
     for (const e of n.errors) problems.push(`${table} ${label}: ${e}`);
     return n.row;
   };
+  const prevHolders = new Set((seed.previous ?? []).flatMap((p) => p.holders.map((h) => h.id)));
+  const prevTitles = new Set((seed.previous ?? []).flatMap((p) => p.titles.map((t) => t.id)));
+  const prevRights = new Set((seed.previous ?? []).flatMap((p) => p.rights.map((r) => r.id)));
 
-  const holders = HOLDERS.map((h) => check('rights_holders', h.id, { ...h, batch: BATCH }));
-  const holderIds = new Set(HOLDERS.map((h) => h.id));
+  const holderIds = new Set<string>();
+  const holders = seed.holders.map((h) => {
+    if (holderIds.has(h.id) || prevHolders.has(h.id)) problems.push(`rights_holders ${h.id}: código repetido`);
+    holderIds.add(h.id);
+    if ((h.representative_seed as { ficticio?: boolean }).ficticio !== true) problems.push(`rights_holders ${h.id}: representante precisa ser fictício`);
+    return check('rights_holders', h.id, { ...h, batch: BATCH });
+  });
   const titleIds = new Set<string>();
-  const titles = TITLES.map((t) => {
-    if (titleIds.has(t.id)) problems.push(`catalog_titles ${t.id}: código repetido`);
+  const usedOldHolders = new Set<string>();
+  const titles = seed.titles.map((t) => {
+    if (titleIds.has(t.id) || prevTitles.has(t.id)) problems.push(`catalog_titles ${t.id}: código repetido`);
     titleIds.add(t.id);
-    if (!holderIds.has(t.rights_holder_id)) problems.push(`catalog_titles ${t.id}: player "${t.rights_holder_id}" não existe no lote`);
+    if (!holderIds.has(t.rights_holder_id)) {
+      if (prevHolders.has(t.rights_holder_id)) usedOldHolders.add(t.rights_holder_id);
+      else problems.push(`catalog_titles ${t.id}: player "${t.rights_holder_id}" não existe`);
+    }
     if (!t.notes.trim()) problems.push(`catalog_titles ${t.id}: sem nota de fonte`);
     return check('catalog_titles', t.id, { ...t, batch: BATCH });
   });
-  const grids = GRIDS.map((g) => {
+  const allTitles = new Set([...titleIds, ...prevTitles]);
+  const grids = seed.grids.map((g) => {
     g.slots.forEach((sl, i) => {
       if (!(sl.genero in GENRES)) problems.push(`grade ${g.station_key} faixa ${i + 1}: gênero "${sl.genero}" não existe`);
-      if (sl.catalog_title_id && !titleIds.has(sl.catalog_title_id)) problems.push(`grade ${g.station_key} faixa ${i + 1}: título "${sl.catalog_title_id}" não está no lote`);
+      if (sl.catalog_title_id && !allTitles.has(sl.catalog_title_id)) problems.push(`grade ${g.station_key} faixa ${i + 1}: título "${sl.catalog_title_id}" não existe`);
       if (!/^\d{2}:\d{2}$/.test(sl.inicio) || !/^\d{2}:\d{2}$/.test(sl.fim)) problems.push(`grade ${g.station_key} faixa ${i + 1}: horário inválido`);
     });
     return check('schedule_templates', g.station_key, { era_id: ERA, station_key: g.station_key, reference_month: g.reference_month ?? REFERENCE_MONTH, slots: g.slots, confidence: g.confidence, notes: g.notes, batch: BATCH });
   });
-  const known = new Set([...titleIds, ...holderIds, 'novelas_turcas']);
-  const rights = RIGHTS.map((r) => {
-    if (!known.has(r.product_ref)) problems.push(`historical_rights ${r.id}: produto "${r.product_ref}" não está no lote`);
+  const known = new Set([...allTitles, ...holderIds, ...prevHolders, 'novelas_turcas']);
+  const rights = seed.rights.map((r) => {
+    if (prevRights.has(r.id)) problems.push(`historical_rights ${r.id}: código repetido`);
+    if (!known.has(r.product_ref)) problems.push(`historical_rights ${r.id}: produto "${r.product_ref}" não existe`);
     return check('historical_rights', String(r.id), { ...r, era_id: ERA, batch: BATCH });
   });
   for (const [table, rows] of [['rights_holders', holders], ['catalog_titles', titles], ['schedule_templates', grids], ['historical_rights', rights]] as const) {
     for (const r of rows) if ('approved' in r) problems.push(`${table}: o lote não deve vir aprovado`);
   }
 
+  // lotes seguintes dependem dos players dos lotes anteriores: confere antes de gravar
+  const oldList = [...usedOldHolders].sort();
+  const prevGuard = oldList.length ? `
+do $$
+begin
+  if (select count(*) from public.rights_holders where id in (${oldList.map((x) => q(x)).join(', ')})) < ${oldList.length} then
+    raise exception 'Este lote usa players do lote anterior que não estão no banco. Rode antes o arquivo do lote anterior (supabase/seeds/catalogo_2026_lote1.sql) e depois este de novo.';
+  end if;
+end $$;` : '';
+
   const sql = `-- Prime Time Manager — catálogo real, era atual (2026), ${BATCH}.
--- Gerado por scripts/gen-catalog-seed.ts a partir de supabase/seeds/catalogo_2026_lote1.ts. Não edite à mão.
+-- Gerado por scripts/gen-catalog-seed.ts a partir de supabase/seeds/${seed.source}. Não edite à mão.
 -- Cole no SQL Editor do Supabase DEPOIS da migração do catálogo. Tudo entra como NÃO aprovado:
 -- revise e aprove no Editor de Catálogo. Rodar de novo não apaga nem desfaz correções feitas no Editor.
 -- Atributos de jogo são estimativas, nunca audiência oficial. Representantes das empresas são fictícios.
 
 ${CATALOG_GUARD}
+${prevGuard}
 
 begin;
 
@@ -161,7 +210,7 @@ commit;
       schedule_templates: catalogRowsToCSV('schedule_templates', grids),
       historical_rights: catalogRowsToCSV('historical_rights', rights),
     },
-    counts: { players: holders.length, titulos: titles.length, grades: grids.length, faixas: GRIDS.reduce((n, g) => n + g.slots.length, 0), direitos: rights.length },
+    counts: { players: holders.length, titulos: titles.length, grades: grids.length, faixas: seed.grids.reduce((n, g) => n + g.slots.length, 0), direitos: rights.length },
     rows: { rights_holders: holders, catalog_titles: titles, schedule_templates: grids, historical_rights: rights },
   };
 }

@@ -87,6 +87,31 @@ test('lote 1 de 2026: válido pelas regras do Editor, sem aprovação e com font
   assert.equal(back.rows.length, 64);
 });
 
+test('lote 2a de 2026: válido, sem códigos repetidos com o lote 1, fonte em cada item e lote 1 + 2a montam o catálogo da partida', async () => {
+  const { buildLote1, buildLote2a } = await import('../supabase/seeds/build.ts');
+  const L2A = await import('../supabase/seeds/catalogo_2026_lote2a.ts');
+  const { buildCatalogSnapshot } = await import('../supabase/functions/_shared/engine/catalogWorld.ts');
+  const built = buildLote2a();
+  assert.deepEqual(built.problems, []);
+  assert.ok(built.counts.titulos >= 120, `esperava ~125 títulos, veio ${built.counts.titulos}`);
+  for (const x of [...L2A.TITLES, ...L2A.HOLDERS, ...L2A.RIGHTS]) assert.ok(x.notes.length > 10, `${x.id} sem nota de fonte`);
+  // só enlatados neste sub-lote (filmes e formatos vêm no 2b)
+  for (const x of L2A.TITLES) assert.ok(['novela', 'serie', 'minisserie', 'desenho', 'documentario'].includes(x.kind), `${x.id}: tipo ${x.kind}`);
+  // o SQL confere que os players do lote 1 já estão no banco
+  assert.match(built.sql, /players do lote anterior/);
+  const back = csvToCatalogRows('catalog_titles', built.csv.catalog_titles!);
+  assert.equal(back.rows.filter((r) => r.errors.length).length, 0);
+  // os dois lotes juntos: Chapolin fica travado para quem não é o SBT (direito do Grupo Chespirito)
+  const l1 = buildLote1().rows;
+  const l2 = built.rows;
+  const cat = buildCatalogSnapshot({
+    titles: [...l1.catalog_titles, ...l2.catalog_titles], templates: l1.schedule_templates,
+    rights: [...l1.historical_rights, ...l2.historical_rights], holders: [...l1.rights_holders, ...l2.rights_holders],
+  })!;
+  assert.equal(cat.titles.length, 64 + built.counts.titulos);
+  assert.ok(cat.rights.some((r) => r.productRef === 'grupo_chespirito' && r.holderStationKey === 'sbt' && r.exclusive));
+});
+
 test('catalog-admin: só o dono edita; valida antes de gravar; aprova, corrige e apaga', async () => {
   const store = new MemoryStore();
   const admin = ctxWith(store, true);
