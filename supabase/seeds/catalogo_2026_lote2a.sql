@@ -15,7 +15,7 @@ end $$;
 do $$
 begin
   if (select count(*) from public.rights_holders where id in ('bbc_studios', 'caracol', 'cj_enm', 'disney', 'eccho_rights', 'global_agency', 'grupo_chespirito', 'inter_medya', 'kanal_d', 'madd', 'nbcu', 'paramount', 'rcn', 'sony', 'telemundo', 'televisa', 'wbd')) < 17 then
-    raise exception 'Este lote usa players do lote anterior que não estão no banco. Rode antes o arquivo do lote anterior (supabase/seeds/catalogo_2026_lote1.sql) e depois este de novo.';
+    raise exception 'Este lote usa players do lote anterior que não estão no banco. Rode antes o arquivo supabase/seeds/catalogo_2026_lote1.sql e depois este de novo.';
   end if;
 end $$;
 

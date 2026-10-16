@@ -386,10 +386,12 @@ export function refreshOffers(state: GameState): void {
   const rng = rngFor(state.meta.seed, 'offers', week);
   const regular = state.offers.filter((o) => !o.special).length;
   const want = 9 - regular;
+  // com catálogo real, enlatados, filmes e formatos aparecem com mais frequência (é onde entram os títulos reais)
+  const cat = state.catalog ? 2 : 1;
   const kinds: [MarketOffer['kind'], number][] = [
-    ['enlatado', 2],
-    ['filmes', 1.2],
-    ['formato', 0.9],
+    ['enlatado', 2 * cat],
+    ['filmes', 1.2 * cat],
+    ['formato', 0.9 * cat],
     ['projeto', 3],
     ['coproducao', 0.8],
     ['talento', 1],

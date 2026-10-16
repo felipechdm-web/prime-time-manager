@@ -7,6 +7,7 @@ import type { CatalogTable } from '../functions/_shared/game/catalog.ts';
 import { BATCH, GRIDS, HOLDERS, REFERENCE_MONTH, RIGHTS, TITLES } from './catalogo_2026_lote1.ts';
 import type { GridSeed, HolderSeed, RightSeed, TitleSeed } from './catalogo_2026_lote1.ts';
 import * as L2A from './catalogo_2026_lote2a.ts';
+import * as L2B from './catalogo_2026_lote2b.ts';
 
 const ERA = 'now';
 
@@ -120,6 +121,11 @@ export function buildLote2a(): BuiltSeed {
 
 export const LOTE1: BatchSeed = { batch: BATCH, source: 'catalogo_2026_lote1.ts', holders: HOLDERS, titles: TITLES, grids: GRIDS, rights: RIGHTS };
 export const LOTE2A: BatchSeed = { batch: L2A.BATCH, source: 'catalogo_2026_lote2a.ts', holders: L2A.HOLDERS, titles: L2A.TITLES, grids: [], rights: L2A.RIGHTS, previous: [LOTE1] };
+export const LOTE2B: BatchSeed = { batch: L2B.BATCH, source: 'catalogo_2026_lote2b.ts', holders: L2B.HOLDERS, titles: L2B.TITLES, grids: [], rights: L2B.RIGHTS, previous: [LOTE1, LOTE2A] };
+
+export function buildLote2b(): BuiltSeed {
+  return buildBatch(LOTE2B);
+}
 
 export function buildBatch(seed: BatchSeed): BuiltSeed {
   const BATCH = seed.batch;
@@ -173,11 +179,12 @@ export function buildBatch(seed: BatchSeed): BuiltSeed {
 
   // lotes seguintes dependem dos players dos lotes anteriores: confere antes de gravar
   const oldList = [...usedOldHolders].sort();
+  const needFiles = (seed.previous ?? []).filter((p) => p.holders.some((x) => usedOldHolders.has(x.id))).map((p) => `supabase/seeds/${p.source.replace('.ts', '.sql')}`);
   const prevGuard = oldList.length ? `
 do $$
 begin
   if (select count(*) from public.rights_holders where id in (${oldList.map((x) => q(x)).join(', ')})) < ${oldList.length} then
-    raise exception 'Este lote usa players do lote anterior que não estão no banco. Rode antes o arquivo do lote anterior (supabase/seeds/catalogo_2026_lote1.sql) e depois este de novo.';
+    raise exception 'Este lote usa players do lote anterior que não estão no banco. Rode antes ${needFiles.length > 1 ? 'os arquivos' : 'o arquivo'} ${needFiles.join(' e ')} e depois este de novo.';
   end if;
 end $$;` : '';
 

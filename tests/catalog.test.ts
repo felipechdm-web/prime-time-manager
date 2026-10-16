@@ -112,6 +112,27 @@ test('lote 2a de 2026: válido, sem códigos repetidos com o lote 1, fonte em ca
   assert.ok(cat.rights.some((r) => r.productRef === 'grupo_chespirito' && r.holderStationKey === 'sbt' && r.exclusive));
 });
 
+test('lote 2b de 2026: filmes e formatos válidos; com os três lotes o catálogo chega a ~300 títulos e filmes da Globo Filmes travam', async () => {
+  const { buildLote1, buildLote2a, buildLote2b } = await import('../supabase/seeds/build.ts');
+  const L2B = await import('../supabase/seeds/catalogo_2026_lote2b.ts');
+  const { buildCatalogSnapshot, exclusiveRight } = await import('../supabase/functions/_shared/engine/catalogWorld.ts');
+  const built = buildLote2b();
+  assert.deepEqual(built.problems, []);
+  for (const x of [...L2B.TITLES, ...L2B.HOLDERS, ...L2B.RIGHTS]) assert.ok(x.notes.length > 10, `${x.id} sem nota de fonte`);
+  for (const x of L2B.TITLES) assert.ok(['filme', 'pacote_filmes', 'formato', 'reality'].includes(x.kind), `${x.id}: tipo ${x.kind}`);
+  const back = csvToCatalogRows('catalog_titles', built.csv.catalog_titles!);
+  assert.equal(back.rows.filter((r) => r.errors.length).length, 0);
+  const all = [buildLote1().rows, buildLote2a().rows, built.rows];
+  const cat = buildCatalogSnapshot({
+    titles: all.flatMap((r) => r.catalog_titles), templates: all[0].schedule_templates,
+    rights: all.flatMap((r) => r.historical_rights), holders: all.flatMap((r) => r.rights_holders),
+  })!;
+  assert.ok(cat.titles.length >= 280 && cat.titles.length <= 320, `total ${cat.titles.length}`);
+  const state = { catalog: cat } as unknown as Parameters<typeof exclusiveRight>[0];
+  const auto = cat.titles.find((x) => x.id === 'o_auto_da_compadecida')!;
+  assert.equal(exclusiveRight(state, auto, '2026-01-05')?.stationKey, 'globo');
+});
+
 test('catalog-admin: só o dono edita; valida antes de gravar; aprova, corrige e apaga', async () => {
   const store = new MemoryStore();
   const admin = ctxWith(store, true);

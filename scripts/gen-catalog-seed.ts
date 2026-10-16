@@ -3,7 +3,7 @@
 //   node scripts/gen-catalog-seed.ts
 
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { buildLote1, buildLote1Ajustes, buildLote2a } from '../supabase/seeds/build.ts';
+import { buildLote1, buildLote1Ajustes, buildLote2a, buildLote2b } from '../supabase/seeds/build.ts';
 
 const built = buildLote1();
 if (built.problems.length) {
@@ -34,3 +34,14 @@ writeFileSync('supabase/seeds/catalogo_2026_lote2a.sql', lote2a.sql, 'utf8');
 mkdirSync('supabase/seeds/catalogo_2026_lote2a', { recursive: true });
 for (const [table, csv] of Object.entries(lote2a.csv)) writeFileSync(`supabase/seeds/catalogo_2026_lote2a/${table}.csv`, csv!, 'utf8');
 console.log('Sub-lote 2a gerado:', lote2a.counts);
+
+// lote 2, sub-lote B: filmes, pacotes de filmes e formatos
+const lote2b = buildLote2b();
+if (lote2b.problems.length) {
+  console.error(`O sub-lote 2b tem ${lote2b.problems.length} problema(s):\n- ${lote2b.problems.join('\n- ')}`);
+  process.exit(1);
+}
+writeFileSync('supabase/seeds/catalogo_2026_lote2b.sql', lote2b.sql, 'utf8');
+mkdirSync('supabase/seeds/catalogo_2026_lote2b', { recursive: true });
+for (const [table, csv] of Object.entries(lote2b.csv)) writeFileSync(`supabase/seeds/catalogo_2026_lote2b/${table}.csv`, csv!, 'utf8');
+console.log('Sub-lote 2b gerado:', lote2b.counts);
