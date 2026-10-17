@@ -1,0 +1,96 @@
+﻿club_id;market_id;era_id;share;confidence;approved;notes;batch
+corinthians;SP;now;0.27;baixa;;"Estimativa a partir das pesquisas nacionais (Ipsos-Ipec 2025: https://www.tupi.fm/esportes/as-maiores-torcidas-do-brasil-em-2025-segundo-nova-pesquisa/; Quaest 2024: https://www.gazetasp.com.br/esportes/nova-pesquisa-aponta-sao-paulo-como-3a-maior-torcida-do-brasil/), com o peso do Sudeste na torcida dos paulistas.";2026-lote4
+palmeiras;SP;now;0.15;baixa;;"Estimativa a partir das pesquisas nacionais (Ipsos-Ipec 2025: https://www.tupi.fm/esportes/as-maiores-torcidas-do-brasil-em-2025-segundo-nova-pesquisa/; Quaest 2024: https://www.gazetasp.com.br/esportes/nova-pesquisa-aponta-sao-paulo-como-3a-maior-torcida-do-brasil/), com o peso do Sudeste na torcida dos paulistas.";2026-lote4
+sao_paulo;SP;now;0.15;baixa;;"Estimativa a partir das pesquisas nacionais (Ipsos-Ipec 2025: https://www.tupi.fm/esportes/as-maiores-torcidas-do-brasil-em-2025-segundo-nova-pesquisa/; Quaest 2024: https://www.gazetasp.com.br/esportes/nova-pesquisa-aponta-sao-paulo-como-3a-maior-torcida-do-brasil/), com o peso do Sudeste na torcida dos paulistas.";2026-lote4
+santos;SP;now;0.05;baixa;;"Estimativa a partir das pesquisas nacionais (Ipsos-Ipec 2025: https://www.tupi.fm/esportes/as-maiores-torcidas-do-brasil-em-2025-segundo-nova-pesquisa/; Quaest 2024: https://www.gazetasp.com.br/esportes/nova-pesquisa-aponta-sao-paulo-como-3a-maior-torcida-do-brasil/), com o peso do Sudeste na torcida dos paulistas.";2026-lote4
+flamengo;SP;now;0.05;baixa;;"Estimativa a partir das pesquisas nacionais (Ipsos-Ipec 2025: https://www.tupi.fm/esportes/as-maiores-torcidas-do-brasil-em-2025-segundo-nova-pesquisa/; Quaest 2024: https://www.gazetasp.com.br/esportes/nova-pesquisa-aponta-sao-paulo-como-3a-maior-torcida-do-brasil/), com o peso do Sudeste na torcida dos paulistas.";2026-lote4
+vasco;SP;now;0.01;baixa;;"Estimativa a partir das pesquisas nacionais (Ipsos-Ipec 2025: https://www.tupi.fm/esportes/as-maiores-torcidas-do-brasil-em-2025-segundo-nova-pesquisa/; Quaest 2024: https://www.gazetasp.com.br/esportes/nova-pesquisa-aponta-sao-paulo-como-3a-maior-torcida-do-brasil/), com o peso do Sudeste na torcida dos paulistas.";2026-lote4
+flamengo;RJ;now;0.42;baixa;;Estimativa ajustada de um Datafolha estadual sem data confirmada (Flamengo 46%, Vasco 16%, Botafogo e Fluminense 9%) e da Quaest 2023 (https://www.itatiaia.com.br/esportes/flamengo-tem-quatro-vezes-mais-torcedores-que-os-rivais-do-rio-de-janeiro-juntos/).;2026-lote4
+vasco;RJ;now;0.14;baixa;;Estimativa ajustada de um Datafolha estadual sem data confirmada (Flamengo 46%, Vasco 16%, Botafogo e Fluminense 9%) e da Quaest 2023 (https://www.itatiaia.com.br/esportes/flamengo-tem-quatro-vezes-mais-torcedores-que-os-rivais-do-rio-de-janeiro-juntos/).;2026-lote4
+fluminense;RJ;now;0.08;baixa;;Estimativa ajustada de um Datafolha estadual sem data confirmada (Flamengo 46%, Vasco 16%, Botafogo e Fluminense 9%) e da Quaest 2023 (https://www.itatiaia.com.br/esportes/flamengo-tem-quatro-vezes-mais-torcedores-que-os-rivais-do-rio-de-janeiro-juntos/).;2026-lote4
+botafogo;RJ;now;0.08;baixa;;Estimativa ajustada de um Datafolha estadual sem data confirmada (Flamengo 46%, Vasco 16%, Botafogo e Fluminense 9%) e da Quaest 2023 (https://www.itatiaia.com.br/esportes/flamengo-tem-quatro-vezes-mais-torcedores-que-os-rivais-do-rio-de-janeiro-juntos/).;2026-lote4
+cruzeiro;BH;now;0.3;baixa;;"Estimativa: pesquisas estaduais antigas dão vantagem ao Cruzeiro, as nacionais recentes empatam os dois (https://www.itatiaia.com.br/esportes/futebol/futebol-nacional/pesquisa-aponta-clubes-com-maiores-torcidas-do-brasil-veja-ranking/; https://www.itatiaia.com.br/esportes/o-maior-raio-x-do-torcedor/vasco-ultrapassa-atletico-e-cruzeiro-e-entra-no-top-5-de-maiores-torcidas-do-brasil/).";2026-lote4
+atletico_mg;BH;now;0.3;baixa;;"Estimativa: pesquisas estaduais antigas dão vantagem ao Cruzeiro, as nacionais recentes empatam os dois (https://www.itatiaia.com.br/esportes/futebol/futebol-nacional/pesquisa-aponta-clubes-com-maiores-torcidas-do-brasil-veja-ranking/; https://www.itatiaia.com.br/esportes/o-maior-raio-x-do-torcedor/vasco-ultrapassa-atletico-e-cruzeiro-e-entra-no-top-5-de-maiores-torcidas-do-brasil/).";2026-lote4
+america_mg;BH;now;0.03;baixa;;"Estimativa: pesquisas estaduais antigas dão vantagem ao Cruzeiro, as nacionais recentes empatam os dois (https://www.itatiaia.com.br/esportes/futebol/futebol-nacional/pesquisa-aponta-clubes-com-maiores-torcidas-do-brasil-veja-ranking/; https://www.itatiaia.com.br/esportes/o-maior-raio-x-do-torcedor/vasco-ultrapassa-atletico-e-cruzeiro-e-entra-no-top-5-de-maiores-torcidas-do-brasil/).";2026-lote4
+flamengo;BH;now;0.05;baixa;;"Estimativa: pesquisas estaduais antigas dão vantagem ao Cruzeiro, as nacionais recentes empatam os dois (https://www.itatiaia.com.br/esportes/futebol/futebol-nacional/pesquisa-aponta-clubes-com-maiores-torcidas-do-brasil-veja-ranking/; https://www.itatiaia.com.br/esportes/o-maior-raio-x-do-torcedor/vasco-ultrapassa-atletico-e-cruzeiro-e-entra-no-top-5-de-maiores-torcidas-do-brasil/).";2026-lote4
+corinthians;BH;now;0.01;baixa;;"Estimativa: pesquisas estaduais antigas dão vantagem ao Cruzeiro, as nacionais recentes empatam os dois (https://www.itatiaia.com.br/esportes/futebol/futebol-nacional/pesquisa-aponta-clubes-com-maiores-torcidas-do-brasil-veja-ranking/; https://www.itatiaia.com.br/esportes/o-maior-raio-x-do-torcedor/vasco-ultrapassa-atletico-e-cruzeiro-e-entra-no-top-5-de-maiores-torcidas-do-brasil/).";2026-lote4
+gremio;POA;now;0.42;baixa;;"Estimativa: dupla Gre-Nal dominante na Grande Porto Alegre; memória.";2026-lote4
+internacional;POA;now;0.4;baixa;;"Estimativa: dupla Gre-Nal dominante na Grande Porto Alegre; memória.";2026-lote4
+flamengo;POA;now;0.02;baixa;;"Estimativa: dupla Gre-Nal dominante na Grande Porto Alegre; memória.";2026-lote4
+juventude;POA;now;0.01;baixa;;"Estimativa: dupla Gre-Nal dominante na Grande Porto Alegre; memória.";2026-lote4
+sport;REC;now;0.3;baixa;;Estimativa a partir dos recortes do Nordeste da Ipsos-Ipec 2025 (https://portaldeprefeitura.com.br/esportes/com-o-sport-em-segundo-ranking-revela-os-times-nordestinos-com-as/600016/) e do trio Sport, Santa Cruz e Náutico.;2026-lote4
+santa_cruz;REC;now;0.15;baixa;;Estimativa a partir dos recortes do Nordeste da Ipsos-Ipec 2025 (https://portaldeprefeitura.com.br/esportes/com-o-sport-em-segundo-ranking-revela-os-times-nordestinos-com-as/600016/) e do trio Sport, Santa Cruz e Náutico.;2026-lote4
+nautico;REC;now;0.1;baixa;;Estimativa a partir dos recortes do Nordeste da Ipsos-Ipec 2025 (https://portaldeprefeitura.com.br/esportes/com-o-sport-em-segundo-ranking-revela-os-times-nordestinos-com-as/600016/) e do trio Sport, Santa Cruz e Náutico.;2026-lote4
+flamengo;REC;now;0.08;baixa;;Estimativa a partir dos recortes do Nordeste da Ipsos-Ipec 2025 (https://portaldeprefeitura.com.br/esportes/com-o-sport-em-segundo-ranking-revela-os-times-nordestinos-com-as/600016/) e do trio Sport, Santa Cruz e Náutico.;2026-lote4
+corinthians;REC;now;0.02;baixa;;Estimativa a partir dos recortes do Nordeste da Ipsos-Ipec 2025 (https://portaldeprefeitura.com.br/esportes/com-o-sport-em-segundo-ranking-revela-os-times-nordestinos-com-as/600016/) e do trio Sport, Santa Cruz e Náutico.;2026-lote4
+vasco;REC;now;0.02;baixa;;Estimativa a partir dos recortes do Nordeste da Ipsos-Ipec 2025 (https://portaldeprefeitura.com.br/esportes/com-o-sport-em-segundo-ranking-revela-os-times-nordestinos-com-as/600016/) e do trio Sport, Santa Cruz e Náutico.;2026-lote4
+bahia;SSA;now;0.38;baixa;;Estimativa a partir dos recortes do Nordeste (https://portaldeprefeitura.com.br/esportes/com-o-sport-em-segundo-ranking-revela-os-times-nordestinos-com-as/600016/).;2026-lote4
+vitoria;SSA;now;0.25;baixa;;Estimativa a partir dos recortes do Nordeste (https://portaldeprefeitura.com.br/esportes/com-o-sport-em-segundo-ranking-revela-os-times-nordestinos-com-as/600016/).;2026-lote4
+flamengo;SSA;now;0.07;baixa;;Estimativa a partir dos recortes do Nordeste (https://portaldeprefeitura.com.br/esportes/com-o-sport-em-segundo-ranking-revela-os-times-nordestinos-com-as/600016/).;2026-lote4
+corinthians;SSA;now;0.02;baixa;;Estimativa a partir dos recortes do Nordeste (https://portaldeprefeitura.com.br/esportes/com-o-sport-em-segundo-ranking-revela-os-times-nordestinos-com-as/600016/).;2026-lote4
+sao_paulo;SSA;now;0.02;baixa;;Estimativa a partir dos recortes do Nordeste (https://portaldeprefeitura.com.br/esportes/com-o-sport-em-segundo-ranking-revela-os-times-nordestinos-com-as/600016/).;2026-lote4
+fortaleza;FOR;now;0.3;baixa;;Estimativa a partir dos recortes do Nordeste (https://portaldeprefeitura.com.br/esportes/com-o-sport-em-segundo-ranking-revela-os-times-nordestinos-com-as/600016/).;2026-lote4
+ceara;FOR;now;0.28;baixa;;Estimativa a partir dos recortes do Nordeste (https://portaldeprefeitura.com.br/esportes/com-o-sport-em-segundo-ranking-revela-os-times-nordestinos-com-as/600016/).;2026-lote4
+flamengo;FOR;now;0.1;baixa;;Estimativa a partir dos recortes do Nordeste (https://portaldeprefeitura.com.br/esportes/com-o-sport-em-segundo-ranking-revela-os-times-nordestinos-com-as/600016/).;2026-lote4
+corinthians;FOR;now;0.03;baixa;;Estimativa a partir dos recortes do Nordeste (https://portaldeprefeitura.com.br/esportes/com-o-sport-em-segundo-ranking-revela-os-times-nordestinos-com-as/600016/).;2026-lote4
+vasco;FOR;now;0.03;baixa;;Estimativa a partir dos recortes do Nordeste (https://portaldeprefeitura.com.br/esportes/com-o-sport-em-segundo-ranking-revela-os-times-nordestinos-com-as/600016/).;2026-lote4
+sao_paulo;FOR;now;0.02;baixa;;Estimativa a partir dos recortes do Nordeste (https://portaldeprefeitura.com.br/esportes/com-o-sport-em-segundo-ranking-revela-os-times-nordestinos-com-as/600016/).;2026-lote4
+athletico_pr;CWB;now;0.27;baixa;;"Estimativa: Athletico e Coritiba dominantes, com muitos torcedores de clubes paulistas; memória.";2026-lote4
+coritiba;CWB;now;0.22;baixa;;"Estimativa: Athletico e Coritiba dominantes, com muitos torcedores de clubes paulistas; memória.";2026-lote4
+corinthians;CWB;now;0.06;baixa;;"Estimativa: Athletico e Coritiba dominantes, com muitos torcedores de clubes paulistas; memória.";2026-lote4
+flamengo;CWB;now;0.05;baixa;;"Estimativa: Athletico e Coritiba dominantes, com muitos torcedores de clubes paulistas; memória.";2026-lote4
+sao_paulo;CWB;now;0.04;baixa;;"Estimativa: Athletico e Coritiba dominantes, com muitos torcedores de clubes paulistas; memória.";2026-lote4
+palmeiras;CWB;now;0.04;baixa;;"Estimativa: Athletico e Coritiba dominantes, com muitos torcedores de clubes paulistas; memória.";2026-lote4
+goias;GYN;now;0.22;baixa;;"Estimativa: Goiás, Vila Nova e Atlético-GO, com muita torcida do Flamengo; memória.";2026-lote4
+vila_nova;GYN;now;0.12;baixa;;"Estimativa: Goiás, Vila Nova e Atlético-GO, com muita torcida do Flamengo; memória.";2026-lote4
+atletico_go;GYN;now;0.07;baixa;;"Estimativa: Goiás, Vila Nova e Atlético-GO, com muita torcida do Flamengo; memória.";2026-lote4
+flamengo;GYN;now;0.15;baixa;;"Estimativa: Goiás, Vila Nova e Atlético-GO, com muita torcida do Flamengo; memória.";2026-lote4
+sao_paulo;GYN;now;0.05;baixa;;"Estimativa: Goiás, Vila Nova e Atlético-GO, com muita torcida do Flamengo; memória.";2026-lote4
+corinthians;GYN;now;0.04;baixa;;"Estimativa: Goiás, Vila Nova e Atlético-GO, com muita torcida do Flamengo; memória.";2026-lote4
+palmeiras;GYN;now;0.04;baixa;;"Estimativa: Goiás, Vila Nova e Atlético-GO, com muita torcida do Flamengo; memória.";2026-lote4
+vasco;GYN;now;0.03;baixa;;"Estimativa: Goiás, Vila Nova e Atlético-GO, com muita torcida do Flamengo; memória.";2026-lote4
+flamengo;DF;now;0.3;baixa;;"Estimativa: torcida dividida entre clubes do Rio e de São Paulo, com o Flamengo à frente; memória.";2026-lote4
+corinthians;DF;now;0.06;baixa;;"Estimativa: torcida dividida entre clubes do Rio e de São Paulo, com o Flamengo à frente; memória.";2026-lote4
+vasco;DF;now;0.06;baixa;;"Estimativa: torcida dividida entre clubes do Rio e de São Paulo, com o Flamengo à frente; memória.";2026-lote4
+sao_paulo;DF;now;0.05;baixa;;"Estimativa: torcida dividida entre clubes do Rio e de São Paulo, com o Flamengo à frente; memória.";2026-lote4
+palmeiras;DF;now;0.05;baixa;;"Estimativa: torcida dividida entre clubes do Rio e de São Paulo, com o Flamengo à frente; memória.";2026-lote4
+fluminense;DF;now;0.02;baixa;;"Estimativa: torcida dividida entre clubes do Rio e de São Paulo, com o Flamengo à frente; memória.";2026-lote4
+botafogo;DF;now;0.02;baixa;;"Estimativa: torcida dividida entre clubes do Rio e de São Paulo, com o Flamengo à frente; memória.";2026-lote4
+cruzeiro;DF;now;0.02;baixa;;"Estimativa: torcida dividida entre clubes do Rio e de São Paulo, com o Flamengo à frente; memória.";2026-lote4
+atletico_mg;DF;now;0.02;baixa;;"Estimativa: torcida dividida entre clubes do Rio e de São Paulo, com o Flamengo à frente; memória.";2026-lote4
+corinthians;CPS;now;0.2;baixa;;"Estimativa: clubes da capital paulista à frente de Ponte Preta e Guarani; memória.";2026-lote4
+palmeiras;CPS;now;0.14;baixa;;"Estimativa: clubes da capital paulista à frente de Ponte Preta e Guarani; memória.";2026-lote4
+sao_paulo;CPS;now;0.13;baixa;;"Estimativa: clubes da capital paulista à frente de Ponte Preta e Guarani; memória.";2026-lote4
+ponte_preta;CPS;now;0.07;baixa;;"Estimativa: clubes da capital paulista à frente de Ponte Preta e Guarani; memória.";2026-lote4
+guarani;CPS;now;0.06;baixa;;"Estimativa: clubes da capital paulista à frente de Ponte Preta e Guarani; memória.";2026-lote4
+santos;CPS;now;0.04;baixa;;"Estimativa: clubes da capital paulista à frente de Ponte Preta e Guarani; memória.";2026-lote4
+flamengo;CPS;now;0.04;baixa;;"Estimativa: clubes da capital paulista à frente de Ponte Preta e Guarani; memória.";2026-lote4
+remo;BEL;now;0.3;baixa;;"Estimativa: Remo e Paysandu divididos, com o Flamengo forte; memória.";2026-lote4
+paysandu;BEL;now;0.3;baixa;;"Estimativa: Remo e Paysandu divididos, com o Flamengo forte; memória.";2026-lote4
+flamengo;BEL;now;0.12;baixa;;"Estimativa: Remo e Paysandu divididos, com o Flamengo forte; memória.";2026-lote4
+vasco;BEL;now;0.04;baixa;;"Estimativa: Remo e Paysandu divididos, com o Flamengo forte; memória.";2026-lote4
+corinthians;BEL;now;0.02;baixa;;"Estimativa: Remo e Paysandu divididos, com o Flamengo forte; memória.";2026-lote4
+flamengo;VIX;now;0.28;baixa;;"Estimativa: torcida concentrada em clubes do Rio; memória.";2026-lote4
+vasco;VIX;now;0.1;baixa;;"Estimativa: torcida concentrada em clubes do Rio; memória.";2026-lote4
+botafogo;VIX;now;0.04;baixa;;"Estimativa: torcida concentrada em clubes do Rio; memória.";2026-lote4
+fluminense;VIX;now;0.04;baixa;;"Estimativa: torcida concentrada em clubes do Rio; memória.";2026-lote4
+corinthians;VIX;now;0.04;baixa;;"Estimativa: torcida concentrada em clubes do Rio; memória.";2026-lote4
+sao_paulo;VIX;now;0.03;baixa;;"Estimativa: torcida concentrada em clubes do Rio; memória.";2026-lote4
+palmeiras;VIX;now;0.03;baixa;;"Estimativa: torcida concentrada em clubes do Rio; memória.";2026-lote4
+flamengo;MAO;now;0.35;baixa;;"Estimativa: torcida concentrada em clubes do Rio, sobretudo o Flamengo; memória.";2026-lote4
+vasco;MAO;now;0.1;baixa;;"Estimativa: torcida concentrada em clubes do Rio, sobretudo o Flamengo; memória.";2026-lote4
+corinthians;MAO;now;0.04;baixa;;"Estimativa: torcida concentrada em clubes do Rio, sobretudo o Flamengo; memória.";2026-lote4
+sao_paulo;MAO;now;0.03;baixa;;"Estimativa: torcida concentrada em clubes do Rio, sobretudo o Flamengo; memória.";2026-lote4
+palmeiras;MAO;now;0.03;baixa;;"Estimativa: torcida concentrada em clubes do Rio, sobretudo o Flamengo; memória.";2026-lote4
+fluminense;MAO;now;0.02;baixa;;"Estimativa: torcida concentrada em clubes do Rio, sobretudo o Flamengo; memória.";2026-lote4
+botafogo;MAO;now;0.02;baixa;;"Estimativa: torcida concentrada em clubes do Rio, sobretudo o Flamengo; memória.";2026-lote4
+avai;FLN;now;0.18;baixa;;"Estimativa: Avaí e Figueirense à frente, com muitos torcedores de Grêmio e Internacional; memória.";2026-lote4
+figueirense;FLN;now;0.15;baixa;;"Estimativa: Avaí e Figueirense à frente, com muitos torcedores de Grêmio e Internacional; memória.";2026-lote4
+gremio;FLN;now;0.08;baixa;;"Estimativa: Avaí e Figueirense à frente, com muitos torcedores de Grêmio e Internacional; memória.";2026-lote4
+internacional;FLN;now;0.06;baixa;;"Estimativa: Avaí e Figueirense à frente, com muitos torcedores de Grêmio e Internacional; memória.";2026-lote4
+flamengo;FLN;now;0.06;baixa;;"Estimativa: Avaí e Figueirense à frente, com muitos torcedores de Grêmio e Internacional; memória.";2026-lote4
+corinthians;FLN;now;0.05;baixa;;"Estimativa: Avaí e Figueirense à frente, com muitos torcedores de Grêmio e Internacional; memória.";2026-lote4
+sao_paulo;FLN;now;0.04;baixa;;"Estimativa: Avaí e Figueirense à frente, com muitos torcedores de Grêmio e Internacional; memória.";2026-lote4
+palmeiras;FLN;now;0.04;baixa;;"Estimativa: Avaí e Figueirense à frente, com muitos torcedores de Grêmio e Internacional; memória.";2026-lote4
+criciuma;FLN;now;0.03;baixa;;"Estimativa: Avaí e Figueirense à frente, com muitos torcedores de Grêmio e Internacional; memória.";2026-lote4
+chapecoense;FLN;now;0.02;baixa;;"Estimativa: Avaí e Figueirense à frente, com muitos torcedores de Grêmio e Internacional; memória.";2026-lote4

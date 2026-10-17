@@ -157,6 +157,21 @@ test('lote 3: grades de janeiro das seis emissoras, sem faixas sobrepostas, 30 a
   assert.match(built.sql, /station_key in \('globo', 'record', 'band'\) and batch = '2026-lote1'/);
 });
 
+test('lote 4: 40 clubes das Séries A e B, torcida em todas as praças e soma de cada praça até 95%', async () => {
+  const { buildLote4 } = await import('../supabase/seeds/build.ts');
+  const L4 = await import('../supabase/seeds/catalogo_2026_lote4.ts');
+  const built = buildLote4();
+  assert.deepEqual(built.problems, []);
+  const series = L4.CLUBS.filter((x) => /Série [AB] em 2026/.test(x.notes));
+  assert.equal(series.length, 40);
+  assert.equal(built.counts.pracas, 15);
+  for (const fb of L4.FANBASE) assert.equal(fb.confidence, 'baixa', 'torcida por praça é estimativa');
+  for (const table of ['clubs', 'club_fanbase'] as const) {
+    const back = csvToCatalogRows(table, built.csv[table]!);
+    assert.equal(back.rows.filter((r) => r.errors.length).length, 0, table);
+  }
+});
+
 test('catalog-admin: só o dono edita; valida antes de gravar; aprova, corrige e apaga', async () => {
   const store = new MemoryStore();
   const admin = ctxWith(store, true);

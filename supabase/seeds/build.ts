@@ -9,6 +9,9 @@ import type { GridSeed, HolderSeed, RightSeed, TitleSeed } from './catalogo_2026
 import * as L2A from './catalogo_2026_lote2a.ts';
 import * as L2B from './catalogo_2026_lote2b.ts';
 import * as L3 from './catalogo_2026_lote3.ts';
+import * as L4 from './catalogo_2026_lote4.ts';
+import { MARKETS } from '../functions/_shared/engine/catalog/markets.ts';
+const CATALOG_MARKETS = () => MARKETS.map((m) => m.code);
 import { parseDays } from '../functions/_shared/engine/catalogWorld.ts';
 import { clockToSlot } from '../functions/_shared/engine/time.ts';
 
@@ -149,6 +152,58 @@ export function gridProblems(g: GridSeed): string[] {
     }
   });
   return out;
+}
+
+// Lote 4: clubes das Séries A e B de 2026 e torcida por praça.
+export function buildLote4(): BuiltSeed & { clubs: Record<string, unknown>[]; fanbase: Record<string, unknown>[] } {
+  const problems: string[] = [];
+  const check = (table: CatalogTable, label: string, raw: Record<string, unknown>) => {
+    const n = normalizeCatalogRow(table, raw);
+    for (const e of n.errors) problems.push(`${table} ${label}: ${e}`);
+    return n.row;
+  };
+  const ids = new Set<string>();
+  const clubs = L4.CLUBS.map((cl) => {
+    if (ids.has(cl.id)) problems.push(`clubs ${cl.id}: código repetido`);
+    ids.add(cl.id);
+    const f = cl.rating_by_season['2026'];
+    if (typeof f !== 'number' || f < 0 || f > 100) problems.push(`clubs ${cl.id}: força de 2026 fora de 0 a 100`);
+    return check('clubs', cl.id, { ...cl, batch: L4.BATCH });
+  });
+  const total = new Map<string, number>();
+  const seen = new Set<string>();
+  const fanbase = L4.FANBASE.map((fb) => {
+    if (!ids.has(fb.club_id)) problems.push(`club_fanbase ${fb.club_id}/${fb.market_id}: clube não existe no lote`);
+    const key = `${fb.club_id}|${fb.market_id}`;
+    if (seen.has(key)) problems.push(`club_fanbase ${key}: repetido`);
+    seen.add(key);
+    total.set(fb.market_id, (total.get(fb.market_id) ?? 0) + fb.share);
+    return check('club_fanbase', key, { ...fb, era_id: ERA, batch: L4.BATCH });
+  });
+  for (const [m, s] of total) if (s > 0.95) problems.push(`praça ${m}: as torcidas somam ${Math.round(s * 100)}% (máximo 95%)`);
+  for (const m of normalizeCatalogRow('club_fanbase', { club_id: 'x', market_id: 'SP', era_id: ERA, share: 0, confidence: 'baixa' }).errors) problems.push(m);
+  const semPraca = (CATALOG_MARKETS() as string[]).filter((m) => !total.has(m));
+  if (semPraca.length) problems.push(`praças sem torcida: ${semPraca.join(', ')}`);
+  for (const r of [...clubs, ...fanbase]) if ('approved' in r) problems.push('o lote não deve vir aprovado');
+  const sql = `-- Prime Time Manager — catálogo real, era atual (2026), ${L4.BATCH}: clubes das Séries A e B e torcida por praça.
+-- Gerado por scripts/gen-catalog-seed.ts a partir de supabase/seeds/catalogo_2026_lote4.ts. Não edite à mão.
+-- Tudo entra como NÃO aprovado. Força dos clubes e torcida por praça são estimativas de jogo (confiança baixa
+-- na torcida). Competições, calendário e jogos ficam para a Fase 6.4. Rodar de novo não desfaz o que você editar.
+
+${CATALOG_GUARD}
+
+begin;
+
+${insertSql('clubs', clubs, '(id)')}
+${insertSql('club_fanbase', fanbase, '(club_id, market_id, era_id)')}
+commit;
+`;
+  return {
+    problems, sql, clubs, fanbase,
+    csv: { clubs: catalogRowsToCSV('clubs', clubs), club_fanbase: catalogRowsToCSV('club_fanbase', fanbase) },
+    counts: { clubes: clubs.length, torcidas: fanbase.length, pracas: total.size },
+    rows: { rights_holders: [], catalog_titles: [], schedule_templates: [], historical_rights: [] },
+  };
 }
 
 export const LOTE3_REPLACES = ['globo', 'record', 'band']; // grades do lote 1 substituídas pelas do lote 3

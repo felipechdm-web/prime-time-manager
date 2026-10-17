@@ -3,7 +3,7 @@
 //   node scripts/gen-catalog-seed.ts
 
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { buildLote1, buildLote1Ajustes, buildLote2a, buildLote2b, buildLote3 } from '../supabase/seeds/build.ts';
+import { buildLote1, buildLote1Ajustes, buildLote2a, buildLote2b, buildLote3, buildLote4 } from '../supabase/seeds/build.ts';
 
 const built = buildLote1();
 if (built.problems.length) {
@@ -56,3 +56,14 @@ writeFileSync('supabase/seeds/catalogo_2026_lote3.sql', lote3.sql, 'utf8');
 mkdirSync('supabase/seeds/catalogo_2026_lote3', { recursive: true });
 for (const [table, csv] of Object.entries(lote3.csv)) writeFileSync(`supabase/seeds/catalogo_2026_lote3/${table}.csv`, csv!, 'utf8');
 console.log('Lote 3 gerado:', lote3.counts);
+
+// lote 4: clubes das Séries A e B de 2026 e torcida por praça
+const lote4 = buildLote4();
+if (lote4.problems.length) {
+  console.error(`O lote 4 tem ${lote4.problems.length} problema(s):\n- ${lote4.problems.join('\n- ')}`);
+  process.exit(1);
+}
+writeFileSync('supabase/seeds/catalogo_2026_lote4.sql', lote4.sql, 'utf8');
+mkdirSync('supabase/seeds/catalogo_2026_lote4', { recursive: true });
+for (const [table, csv] of Object.entries(lote4.csv)) writeFileSync(`supabase/seeds/catalogo_2026_lote4/${table}.csv`, csv!, 'utf8');
+console.log('Lote 4 gerado:', lote4.counts);
