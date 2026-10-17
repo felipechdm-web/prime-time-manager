@@ -182,6 +182,7 @@ function giveToRival(state: GameState, t: CatalogTitleSnap, bid: RivalBid): void
   const g = catalogGenre(t);
   const p = programFromCatalog(ctx, st, t, { minutes: t.durationMin ?? GENRES[g].dur[0], status: 'ready' });
   st.ai.reserve.push(p.id);
+  state.offers = state.offers.filter((o) => o.catalogTitleId !== t.id);
   state.rightsContracts ??= [];
   state.rightsContracts.push({
     id: nextId(state, 'rc'), stationId: st.id, holderId: t.holderId, productRef: t.id, label: t.titleBr, origin: 'negociacao',
@@ -326,7 +327,7 @@ export async function negotiationTurnHandler(ctx: HandlerCtx, body: Record<strin
     interp = await interpret(ctx, state, row.id, pub, text);
     if (!interp && ctx.llm) notes.push('Não consegui ler a sua fala; vale a proposta do formulário.');
     if (!ctx.llm) notes.push('Sem a IA, a proposta vale pelo formulário (o texto fica só no histórico).');
-    if (interp?.intent === 'aceitar' && pub.onTable && pub.round > 0) action = 'aceitar';
+    if (interp?.intent === 'aceitar' && pub.onTable && pub.kind === 'titulo') action = 'aceitar';
     else if (interp?.intent === 'levantar') action = 'levantar';
     else if (interp?.intent === 'pensar') action = 'pensar';
   }
@@ -357,7 +358,7 @@ export async function negotiationTurnHandler(ctx: HandlerCtx, body: Record<strin
   if (action === 'aceitar') {
     const acc = acceptCounter(hidden, pub);
     if ('error' in acc) throw new HttpError(400, acc.error);
-    const d = { type: 'aceite' as const, reasons: ['jogador_aceitou_a_contraproposta'], counter: null, final: true, patiencePct: acc.pub.patiencePct, bluff: null, relationDelta: 0, argumentTags: [] };
+    const d = { type: 'aceite' as const, reasons: ['jogador_aceitou_a_contraproposta'], counter: null, final: false, patiencePct: acc.pub.patiencePct, bluff: null, relationDelta: 0, argumentTags: [] };
     const v = await voice(ctx, state, row.id, acc.pub, envelopeOf(state, acc.pub, { type: 'aceite', reasons: d.reasons }, acc.terms, text || null), await roundHistory(ctx, id), () => decisionLines(state.meta.era, acc.pub, d));
     await saveGame(ctx, row, state);
     await persistNegotiation(ctx, id, acc.pub, acc.hidden);
@@ -428,6 +429,12 @@ export async function negotiationCloseHandler(ctx: HandlerCtx, body: Record<stri
   const contract = contractFromDeal(state, { stationId: ps.id, holderId: pub.holderId, titleId: t.id, label: t.titleBr, terms, negotiationId: id, programId: p.id });
   state.rightsContracts ??= [];
   state.rightsContracts.push(contract);
+  state.offers = state.offers.filter((o) => o.catalogTitleId !== t.id); // o título sai do Mercado
+  // a 1ª parcela vence na assinatura: entra no custo de aquisições desta semana
+  const econ = state.weekProgress.econ[ps.id] ?? [0, 0, 0, 0, 0, 0];
+  while (econ.length < 6) econ.push(0);
+  for (const pay of contract.payments) if (pay.date <= state.meta.date) { pay.paid = true; econ[5] += pay.amount; }
+  state.weekProgress.econ[ps.id] = econ;
   adjustRelation(state, pub.holderId, ps.id, 5, 'contrato assinado');
   if (t.brStations.length && !t.brStations.includes(ps.realKey ?? '')) {
     const where = t.brStations.map((k) => { const nm = state.stations.find((s) => s.realKey === k)?.name ?? k.toUpperCase(); return `${stationArticle(nm).em} ${nm}`; }).join(' e ');

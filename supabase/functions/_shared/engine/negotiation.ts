@@ -512,7 +512,8 @@ export function evaluateRound(state: GameState, stationId: string, hiddenIn: Neg
     h.patience -= 1;
     pub.patiencePct = patiencePct(h);
     if (h.patience <= 0 || round >= MAX_ROUNDS) pub.status = 'fracassada';
-    return { hidden: h, pub, decision: { type: 'recusa', reasons: ['produto_com_exclusividade'], counter: null, final: pub.status !== 'aberta', patiencePct: pub.patiencePct, bluff: args.bluff, relationDelta: args.relDelta + 2, argumentTags: args.used } };
+    // a conversa cordial planta relacionamento, mas só a primeira rodada da reunião conta (sem "farmar" pontos)
+    return { hidden: h, pub, decision: { type: 'recusa', reasons: ['produto_com_exclusividade'], counter: null, final: pub.status !== 'aberta', patiencePct: pub.patiencePct, bluff: args.bluff, relationDelta: args.relDelta + (round === 1 ? 2 : 0), argumentTags: args.used } };
   }
 
   const floor = effectiveFloor(h);
@@ -556,9 +557,10 @@ export function evaluateRound(state: GameState, stationId: string, hiddenIn: Neg
   };
 }
 
-// o jogador aceita a contraproposta que está na mesa: sempre aceitável, porque foi o próprio player que a fez
+// o jogador aceita a proposta que está na mesa (a de abertura ou a última contraproposta): sempre aceitável,
+// porque foi o próprio player que a fez
 export function acceptCounter(hiddenIn: NegHidden, pubIn: NegPublic): { hidden: NegHidden; pub: NegPublic; terms: TermSheet } | { error: string } {
-  if (pubIn.status !== 'aberta' || !pubIn.onTable || pubIn.round === 0) return { error: 'Não há contraproposta do player na mesa.' };
+  if (pubIn.status !== 'aberta' || !pubIn.onTable || pubIn.kind !== 'titulo') return { error: 'Não há proposta do player na mesa.' };
   const pub = structuredClone(pubIn);
   pub.status = 'fechada';
   return { hidden: structuredClone(hiddenIn), pub, terms: pub.onTable! };

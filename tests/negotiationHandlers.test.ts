@@ -101,6 +101,9 @@ test('sem IA: vitrine, abertura (agenda), rodadas pelo formulário, aceite e con
     assert.equal(prog.catalogTitleId, 'friends');
     assert.equal(prog.status, 'ready');
     assert.equal(prog.costPerEp, 0, 'direitos pagos no contrato');
+    assert.ok(!s1.offers.some((o) => o.catalogTitleId === 'friends'), 'o título sai do Mercado');
+    const signed = s1.rightsContracts!.find((c) => c.negotiationId === opened.negotiationId)!;
+    assert.equal(signed.payments[0].paid, true, '1ª parcela paga na assinatura');
     assert.ok(s1.rightsContracts!.some((c) => c.negotiationId === opened.negotiationId && c.payments.length >= 1));
     assert.ok((await store.select('inbox_messages', { game_id: gameId })).some((m) => String(m.subject).includes('Contrato assinado')));
     // fechar de novo não duplica

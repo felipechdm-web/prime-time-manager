@@ -85,6 +85,12 @@ prime-time-manager/
   outra emissora registra uma divergência (`divergences`), que o Mestre pode comentar. Sem catálogo aprovado, no
   Brasil fictício e no modo demonstração, o mundo é gerado exatamente como antes (mesma semente, mesmos números).
   Atributos de jogo dos títulos são estimativas, nunca audiência oficial.
+- **Mesa de Negociação (v2, seção 8B)**: títulos reais não têm compra direta; o preço sai de uma reunião com o
+  player (tela Mercado de Direitos). O motor (`engine/negotiation.ts`) calcula o valor justo, sorteia preço mínimo e
+  alvo por estilo do player, decide aceite, recusa ou contraproposta pela utilidade e cede a cada rodada; argumentos
+  mexem no máximo 5% no mínimo e blefes são testados contra o interesse real dos rivais. A IA (Haiku, esforço baixo)
+  só lê a fala do jogador e dá voz à decisão; o segredo do player fica em `negotiation_secrets`, que o navegador não
+  lê. Exclusividades reais da largada viram contratos ativos (tela Contratos).
 - **Modelos (v2, seção 17.5)**: todas as funções usam `claude-haiku-5-5` com esforço baixo e raciocínio desligado;
   cada função tem o seu `max_tokens` (`supabase/functions/_shared/game/llmConfig.ts`). O Sonnet 5.5 fica como
   modo premium desligado (`LLM_PREMIUM=on` liga, só na avaliação com a presidência). Tudo pode ser trocado por

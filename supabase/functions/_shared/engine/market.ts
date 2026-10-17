@@ -459,6 +459,8 @@ export function buyOffer(state: GameState, offerId: string, bid?: number): BuyRe
   const era = state.meta.era;
   const ps = playerStation(state);
   if (o.lockedBy) return { ok: false, message: `"${o.title}" é ${lockLabel(o.lockedBy)}. Não está à venda.` };
+  // título real (Fase 6.3): não tem compra instantânea; o preço sai da Mesa de Negociação com o player
+  if (o.catalogTitleId) return { ok: false, message: `"${o.title}" é um título real: negocie com o player no Mercado de Direitos.` };
   switch (o.kind) {
     case 'leilao': {
       if (!o.auction) return { ok: false, message: 'Leilão inválido.' };

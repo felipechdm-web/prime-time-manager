@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { MemoryStore } from '../supabase/functions/_shared/game/memoryStore.ts';
 import { applyIntentHandler, createGame } from '../supabase/functions/_shared/game/handlers.ts';
+import { negotiationCloseHandler, negotiationOpenHandler, negotiationTurnHandler } from '../supabase/functions/_shared/game/negotiationHandlers.ts';
 import { validateMestrePlain } from '../supabase/functions/_shared/game/validators.ts';
 import { resolveLLMConfig } from '../supabase/functions/_shared/game/llmConfig.ts';
 import type { HandlerCtx } from '../supabase/functions/_shared/game/types.ts';
@@ -105,7 +106,7 @@ test('partida no Brasil real com catálogo: grades reais, mercado real, exclusiv
   assert.equal(refused.ok, false);
   assert.match(refused.message, /exclusivo do SBT até 12\/2028/);
 
-  // título real livre que no Brasil passou em outra emissora: compra registra divergência
+  // título real livre que no Brasil passou em outra emissora: não tem compra direta (Fase 6.3)...
   const free = findOffer(state, (o) => !o.lockedBy && !!o.catalogTitleId && o.price === 0
     && (state.catalog!.titles.find((t) => t.id === o.catalogTitleId)?.brStations.length ?? 0) > 0);
   assert.ok(free, 'oferta real livre');
@@ -113,9 +114,15 @@ test('partida no Brasil real com catálogo: grades reais, mercado real, exclusiv
   row.state.offers.push(free!);
   await store.updateGame(gameId, { state: row.state }, row.version);
   const r = await applyIntentHandler(ctx, { gameId, intent: { type: 'buy_offer', offerId: free!.id } });
-  assert.equal(r.result.ok, true, r.result.message);
+  assert.equal(r.result.ok, false);
+  assert.match(r.result.message, /Mercado de Direitos/);
+  // ...e fechar o contrato na Mesa de Negociação registra a divergência
+  const opened = await negotiationOpenHandler(ctx, { gameId, titleId: free!.catalogTitleId }) as { negotiationId: string };
+  const acc = await negotiationTurnHandler(ctx, { negotiationId: opened.negotiationId, action: 'aceitar' }) as { pub: { status: string } };
+  assert.equal(acc.pub.status, 'fechada');
+  const closed = await negotiationCloseHandler(ctx, { negotiationId: opened.negotiationId }) as { programId: string };
   const after = (await store.getGame(gameId))!.state;
-  const bought = after.programs.find((p) => p.id === r.result.programId)!;
+  const bought = after.programs.find((p) => p.id === closed.programId)!;
   assert.equal(bought.catalogTitleId, free!.catalogTitleId);
   assert.equal(after.divergences?.length, 1);
   assert.equal(after.pendingDivergences, undefined, 'a fila não fica salva no estado');

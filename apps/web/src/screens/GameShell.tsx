@@ -21,6 +21,7 @@ import { EndGameBanner } from '../components/EndGame.tsx';
 import { Boletim } from './Boletim.tsx';
 import { Grade } from './Grade.tsx';
 import { Acervo } from './Acervo.tsx';
+import { Direitos } from './Direitos.tsx';
 import { Inbox } from './Inbox.tsx';
 import { Reunioes } from './Reunioes.tsx';
 import { Comercial } from './Comercial.tsx';
@@ -36,6 +37,7 @@ export const NAV: { id: string; label: string; icon: string }[] = [
   { id: 'caixa', label: 'Caixa de entrada', icon: '✉️' },
   { id: 'reunioes', label: 'Reuniões', icon: '🤝' },
   { id: 'acervo', label: 'Acervo e Mercado', icon: '🎞️' },
+  { id: 'direitos', label: 'Mercado de Direitos', icon: '📜' },
   { id: 'comercial', label: 'Comercial', icon: '💰' },
   { id: 'pessoas', label: 'Pessoas', icon: '👥' },
   { id: 'concorrencia', label: 'Concorrência', icon: '📡' },
@@ -103,6 +105,7 @@ export function GameShell({ gameId, screen }: { gameId: string; screen: string }
   switch (screen) {
     case 'grade': content = <Grade {...props} />; break;
     case 'acervo': content = <Acervo {...props} />; break;
+    case 'direitos': content = <Direitos {...props} />; break;
     case 'caixa': content = <Inbox {...props} />; break;
     case 'reunioes': content = <Reunioes {...props} />; break;
     case 'comercial': content = <Comercial {...props} />; break;

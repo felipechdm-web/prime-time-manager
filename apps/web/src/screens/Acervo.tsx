@@ -6,6 +6,7 @@ import { DEV_STAGES } from '@engine/market.ts';
 import { lockLabel } from '@engine/catalogWorld.ts';
 import type { MarketOffer, Program } from '@engine/types.ts';
 import { useAction } from '../lib/queries.ts';
+import { go } from '../lib/router.ts';
 import { useUI } from '../lib/ui.ts';
 import { fmtPts, moneyEra } from '../lib/format.ts';
 import { Badge, Bar, Button, Card, Empty, GenreChip, inputClass, Modal, Tabs, Tip } from '../components/ui.tsx';
@@ -174,7 +175,15 @@ function Market({ gameId, state }: ScreenProps) {
                   {o.auction && (<><span className="text-muted">Lance mínimo</span><span className="tabular text-right">{moneyEra(era, o.auction.minBid)}</span><span className="text-muted">Seu lance</span><span className="tabular text-right">{o.auction.playerBid ? moneyEra(era, o.auction.playerBid) : '—'}</span></>)}
                 </div>
                 {active && (
-                  o.lockedBy ? (
+                  o.catalogTitleId ? (
+                    // título real: preço e aceite saem da Mesa de Negociação (Fase 6.3)
+                    <div className="space-y-1.5">
+                      {o.lockedBy && <p className="rounded border border-border px-3 py-2 text-center text-xs text-muted">Não está à venda: {lockLabel(o.lockedBy)}.</p>}
+                      <Button variant={o.lockedBy ? 'secondary' : 'primary'} full onClick={() => go(`g/${gameId}/direitos?title=${o.catalogTitleId}`)}>
+                        {o.lockedBy ? 'Reunião de relacionamento com o player' : 'Negociar com o player'}
+                      </Button>
+                    </div>
+                  ) : o.lockedBy ? (
                     <p className="rounded border border-border px-3 py-2 text-center text-xs text-muted">Não está à venda: {lockLabel(o.lockedBy)}.</p>
                   ) : o.kind === 'leilao' ? (
                     <div className="flex gap-2">
