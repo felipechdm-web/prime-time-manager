@@ -255,7 +255,7 @@ function Page({ children }: { children: ReactNode }) {
       <header className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="text-xl font-black sm:text-2xl">Editor de Catálogo</h1>
-          <p className="text-sm text-muted">Títulos, empresas e grades reais. Só os itens aprovados entram nas partidas novas.</p>
+          <p className="text-sm text-muted">Títulos, empresas, grades, competições e clubes reais. Só os itens aprovados entram nas partidas novas.</p>
         </div>
         <Button size="sm" variant="ghost" onClick={() => go('/')}>← Partidas</Button>
       </header>
@@ -270,7 +270,8 @@ function subtitle(table: CatalogTable, r: Row): string {
   if (table === 'rights_holders') parts.push(r.category, Array.isArray(r.eras) ? (r.eras as string[]).join('/') : null);
   if (table === 'schedule_templates') parts.push(r.era_id, Array.isArray(r.slots) ? `${(r.slots as unknown[]).length} faixas` : null);
   if (table === 'historical_rights') parts.push(r.era_id, r.valid_from, r.valid_to);
-  if (table === 'clubs') parts.push(r.country);
+  if (table === 'sports_competitions') parts.push(r.kind, r.scope, r.rights_holder_id, typeof r.base_appeal === 'number' ? `apelo ${r.base_appeal}` : null);
+  if (table === 'clubs') parts.push(r.country, Array.isArray(r.rivalries) && r.rivalries.length ? `${r.rivalries.length} clássico(s)` : null);
   if (table === 'club_fanbase') parts.push(r.era_id, typeof r.share === 'number' ? `${Math.round(r.share * 100)}%` : null);
   parts.push(r.batch);
   return parts.filter((p) => p !== null && p !== undefined && p !== '').join(' · ');

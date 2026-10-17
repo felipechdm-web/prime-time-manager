@@ -10,6 +10,8 @@ import * as L2A from './catalogo_2026_lote2a.ts';
 import * as L2B from './catalogo_2026_lote2b.ts';
 import * as L3 from './catalogo_2026_lote3.ts';
 import * as L4 from './catalogo_2026_lote4.ts';
+import * as L5 from './catalogo_2026_lote5_esporte.ts';
+import { REAL_STATIONS } from '../functions/_shared/engine/catalog/eras.ts';
 import { MARKETS } from '../functions/_shared/engine/catalog/markets.ts';
 const CATALOG_MARKETS = () => MARKETS.map((m) => m.code);
 import { parseDays } from '../functions/_shared/engine/catalogWorld.ts';
@@ -203,6 +205,181 @@ commit;
     csv: { clubs: catalogRowsToCSV('clubs', clubs), club_fanbase: catalogRowsToCSV('club_fanbase', fanbase) },
     counts: { clubes: clubs.length, torcidas: fanbase.length, pracas: total.size },
     rows: { rights_holders: [], catalog_titles: [], schedule_templates: [], historical_rights: [] },
+  };
+}
+
+// Lote 5 (Fase 6.4): players do esporte, competições de 2026, direitos de TV aberta na largada e clássicos.
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+const PARTICIPANT_PREFIX = /^(generico|selecao):[a-z0-9_]+$/;
+
+export function buildLote5(): BuiltSeed & { competitions: Record<string, unknown>[]; rivalries: Record<string, { club: string; weight: number; name: string }[]> } {
+  const problems: string[] = [];
+  const check = (table: CatalogTable, label: string, raw: Record<string, unknown>) => {
+    const n = normalizeCatalogRow(table, raw);
+    for (const e of n.errors) problems.push(`${table} ${label}: ${e}`);
+    return n.row;
+  };
+  const prevHolders = new Set([...HOLDERS, ...L2A.HOLDERS, ...L2B.HOLDERS].map((h) => h.id));
+  const prevRights = new Set([...RIGHTS, ...L2A.RIGHTS, ...L2B.RIGHTS].map((r) => r.id));
+  const clubIds = new Set(L4.CLUBS.map((c) => c.id));
+  const stationKeys = new Set(REAL_STATIONS.now.map((s) => s.key));
+
+  const holderIds = new Set<string>();
+  const holders = L5.HOLDERS.map((h) => {
+    if (holderIds.has(h.id) || prevHolders.has(h.id)) problems.push(`rights_holders ${h.id}: código repetido`);
+    holderIds.add(h.id);
+    if ((h.representative_seed as { ficticio?: boolean }).ficticio !== true) problems.push(`rights_holders ${h.id}: representante precisa ser fictício`);
+    if (!h.notes.trim()) problems.push(`rights_holders ${h.id}: sem nota de fonte`);
+    return check('rights_holders', h.id, { ...h, batch: L5.BATCH });
+  });
+  const allHolders = new Set([...holderIds, ...prevHolders]);
+  const oldHoldersUsed = new Set<string>();
+  const useHolder = (id: string, label: string) => {
+    if (holderIds.has(id)) return;
+    if (prevHolders.has(id)) oldHoldersUsed.add(id);
+    else problems.push(`${label}: player "${id}" não existe`);
+  };
+
+  const compIds = new Set<string>();
+  const competitions = L5.COMPETITIONS.map((c) => {
+    const label = `sports_competitions ${c.id}`;
+    if (compIds.has(c.id)) problems.push(`${label}: código repetido`);
+    compIds.add(c.id);
+    if (c.rights_holder_id) useHolder(c.rights_holder_id, label);
+    if (!c.notes.trim()) problems.push(`${label}: sem nota de fonte`);
+    const fmt = c.format as Record<string, unknown>;
+    for (const [season, list] of Object.entries(c.participants)) {
+      for (const p of list) if (!clubIds.has(p) && !PARTICIPANT_PREFIX.test(p)) problems.push(`${label} ${season}: participante "${p}" não existe (clube do lote 4, generico:faixa ou selecao:pais)`);
+      const expected = Number(fmt.clubes ?? fmt.selecoes ?? 0);
+      if (expected && list.length !== expected) problems.push(`${label} ${season}: ${list.length} participantes, o formato diz ${expected}`);
+      const real = list.filter((p) => clubIds.has(p));
+      if (new Set(real).size !== real.length) problems.push(`${label} ${season}: clube repetido`);
+    }
+    const blocos = fmt.blocos as Record<string, string[]> | undefined;
+    if (blocos) {
+      for (const h of Object.keys(blocos)) useHolder(h, `${label} bloco`);
+      const inBlocks = Object.values(blocos).flat().sort();
+      const season = Object.values(c.participants)[0] ?? [];
+      if (inBlocks.join() !== [...season].sort().join()) problems.push(`${label}: os blocos não batem com os participantes`);
+    }
+    for (const [season, rules] of Object.entries(c.calendar_rules)) {
+      if (season === 'concorrencias') {
+        for (const t of rules as Record<string, unknown>[]) {
+          useHolder(String(t.vendedor), `${label} concorrência`);
+          for (const k of ['abre', 'decide_ate']) if (!ISO_DAY.test(String(t[k]))) problems.push(`${label} concorrência: ${k} inválido`);
+        }
+        continue;
+      }
+      const r = rules as Record<string, unknown>;
+      for (const k of ['inicio', 'fim']) if (r[k] !== undefined && !ISO_DAY.test(String(r[k]))) problems.push(`${label} ${season}: ${k} inválido`);
+      if (r.inicio && r.fim && String(r.fim) < String(r.inicio)) problems.push(`${label} ${season}: fim antes do início`);
+      for (const hr of (r.horarios as { dias: string; hora: string }[] | undefined) ?? []) {
+        if (!parseDays(hr.dias).length) problems.push(`${label} ${season}: dias "${hr.dias}" inválidos`);
+        if (!HHMM.test(hr.hora)) problems.push(`${label} ${season}: hora "${hr.hora}" inválida`);
+      }
+      const fases = ((fmt.fases as { id: string }[] | undefined) ?? []).map((f) => f.id);
+      for (const [phase, days] of Object.entries((r.datas as Record<string, string[]> | undefined) ?? {})) {
+        if (fases.length && !fases.includes(phase)) problems.push(`${label} ${season}: fase "${phase}" não existe no formato`);
+        for (const d of days) if (!ISO_DAY.test(d) || Number.isNaN(Date.parse(d))) problems.push(`${label} ${season}: data "${d}" inválida`);
+      }
+      const gps = r.gps as { data: string; hora: string; tv_aberta?: boolean }[] | undefined;
+      if (gps) {
+        if (fmt.etapas && gps.length !== Number(fmt.etapas)) problems.push(`${label} ${season}: ${gps.length} GPs, o formato diz ${fmt.etapas}`);
+        for (const g of gps) if (!ISO_DAY.test(g.data) || !HHMM.test(g.hora)) problems.push(`${label} ${season}: GP com data ou hora inválida`);
+        const sorted = gps.map((g) => g.data);
+        if (sorted.join() !== [...sorted].sort().join()) problems.push(`${label} ${season}: GPs fora de ordem`);
+      }
+    }
+    return check('sports_competitions', c.id, { ...c, eras: ['now'], batch: L5.BATCH });
+  });
+
+  const rights = L5.RIGHTS.map((r) => {
+    const label = `historical_rights ${r.id}`;
+    if (prevRights.has(r.id)) problems.push(`${label}: código repetido`);
+    if (!compIds.has(r.product_ref)) problems.push(`${label}: competição "${r.product_ref}" não existe`);
+    if (!stationKeys.has(r.holder_station_key)) problems.push(`${label}: emissora "${r.holder_station_key}" não existe no jogo`);
+    if (r.terms.tipo !== 'esporte') problems.push(`${label}: termos sem tipo "esporte"`);
+    const cedente = String(r.terms.cedente ?? '');
+    if (cedente !== 'clubes') useHolder(cedente, `${label} cedente`);
+    const gps = (L5.COMPETITIONS.find((c) => c.id === r.product_ref)?.calendar_rules['2026'] as { gps?: { tv_aberta?: boolean }[] } | undefined)?.gps;
+    if (gps && r.terms.gps_ao_vivo_tv_aberta !== undefined && gps.filter((g) => g.tv_aberta).length !== r.terms.gps_ao_vivo_tv_aberta) problems.push(`${label}: número de GPs na TV aberta não bate com o calendário`);
+    return check('historical_rights', String(r.id), { ...r, era_id: ERA, batch: L5.BATCH });
+  });
+  const rightIds = new Set<number>();
+  for (const r of L5.RIGHTS) {
+    if (rightIds.has(r.id)) problems.push(`historical_rights ${r.id}: repetido no lote`);
+    rightIds.add(r.id);
+  }
+
+  // clássicos: cada clube recebe a lista dos seus rivais (os dois lados)
+  const rivalries: Record<string, { club: string; weight: number; name: string }[]> = {};
+  const pairs = new Set<string>();
+  for (const rv of L5.RIVALRIES) {
+    for (const id of [rv.a, rv.b]) if (!clubIds.has(id)) problems.push(`clássico ${rv.name}: clube "${id}" não existe no lote 4`);
+    if (rv.weight < 1 || rv.weight > 2) problems.push(`clássico ${rv.name}: peso fora de 1 a 2`);
+    const key = [rv.a, rv.b].sort().join('|');
+    if (pairs.has(key) || rv.a === rv.b) problems.push(`clássico ${rv.name}: repetido`);
+    pairs.add(key);
+    (rivalries[rv.a] ??= []).push({ club: rv.b, weight: rv.weight, name: rv.name });
+    (rivalries[rv.b] ??= []).push({ club: rv.a, weight: rv.weight, name: rv.name });
+  }
+  for (const [id, list] of Object.entries(rivalries)) {
+    const n = normalizeCatalogRow('clubs', { id, name: 'x', rivalries: list, confidence: 'media' });
+    for (const e of n.errors) problems.push(`clubs ${id}: ${e}`);
+  }
+  for (const r of [...holders, ...competitions, ...rights]) if ('approved' in r) problems.push('o lote não deve vir aprovado');
+
+  const oldList = [...oldHoldersUsed].sort();
+  const rivalClubs = Object.keys(rivalries).sort();
+  const updates = rivalClubs.map((id) =>
+    `update public.clubs set rivalries = ${q(rivalries[id])}, approved = false, notes = case when notes like '%Clássicos:%' then notes else concat_ws(' ', notes, ${q(L5.RIVALRY_NOTE)}) end, updated_at = now()\nwhere id = ${q(id)} and rivalries = '[]'::jsonb;`);
+  const sql = `-- Prime Time Manager — catálogo real, era atual (2026), ${L5.BATCH}: esporte (Fase 6.4).
+-- Gerado por scripts/gen-catalog-seed.ts a partir de supabase/seeds/catalogo_2026_lote5_esporte.ts. Não edite à mão.
+-- 1) Players do esporte (ligas, CBF, federações, Conmebol, UEFA, FIFA, F1), com representantes fictícios.
+-- 2) Competições de 2026 (Brasileirão A e B, Copa do Brasil, Libertadores, Sul-Americana, Champions, Copa do Mundo,
+--    Fórmula 1 e os estaduais de SP, RJ, MG e RS), com formato, calendário e participantes.
+-- 3) Quem tinha os direitos de TV aberta na largada (mapa da seção 8C.2).
+-- 4) Clássicos nos clubes do lote 4: esses clubes voltam para PENDENTE até você revisar e aprovar de novo.
+-- Tudo entra como NÃO aprovado. Apelo, forças e pesos são estimativas de jogo. Nenhum atleta real aparece.
+-- Rodar de novo não duplica nada nem desfaz o que você editar no Editor.
+
+${CATALOG_GUARD}
+
+do $$
+begin
+  if to_regclass('public.sports_competitions') is null then
+    raise exception 'A tabela de competições ainda não existe. Rode antes a migração supabase/migrations/20261020000000_esporte.sql (passo 1 da Fase 6.4) e depois este arquivo de novo.';
+  end if;
+  if (select count(*) from public.rights_holders where id in (${oldList.map((x) => q(x)).join(', ')})) < ${oldList.length} then
+    raise exception 'Este lote usa players do lote 1 (${oldList.join(', ')}) que não estão no banco. Rode antes supabase/seeds/catalogo_2026_lote1.sql e depois este de novo.';
+  end if;
+  if (select count(*) from public.clubs where id in (${rivalClubs.map((x) => q(x)).join(', ')})) < ${rivalClubs.length} then
+    raise exception 'Faltam clubes do lote 4 no banco. Rode antes supabase/seeds/catalogo_2026_lote4.sql e depois este de novo.';
+  end if;
+end $$;
+
+begin;
+
+${insertSql('rights_holders', holders, '(id)')}
+${insertSql('sports_competitions', competitions, '(id)')}
+${insertSql('historical_rights', rights, '(id)')}
+select setval(pg_get_serial_sequence('public.historical_rights', 'id'), greatest((select max(id) from public.historical_rights), 1));
+
+-- clássicos (só onde o clube ainda não tem clássicos: rodar de novo não desfaz o que você editar)
+${updates.join('\n')}
+
+commit;
+`;
+  return {
+    problems, sql, competitions, rivalries,
+    csv: {
+      rights_holders: catalogRowsToCSV('rights_holders', holders),
+      sports_competitions: catalogRowsToCSV('sports_competitions', competitions),
+      historical_rights: catalogRowsToCSV('historical_rights', rights),
+    },
+    counts: { players: holders.length, competicoes: competitions.length, direitos: rights.length, classicos: L5.RIVALRIES.length, clubes_com_classicos: rivalClubs.length },
+    rows: { rights_holders: holders, catalog_titles: [], schedule_templates: [], historical_rights: rights },
   };
 }
 

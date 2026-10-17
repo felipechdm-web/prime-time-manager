@@ -611,6 +611,7 @@ export function initialContracts(state: GameState): void {
     if (!st) continue;
     const t = cat.titles.find((x) => x.id === r.productRef);
     const holderId = t?.holderId ?? (cat.holders.some((x) => x.id === r.productRef) ? r.productRef : null);
+    if (r.kind === 'esporte') continue; // direitos esportivos: viram contratos no motor esportivo (Fase 6.4)
     if (r.kind === 'relacionamento') {
       // ex.: distribuidoras turcas com a Record: relação forte, sem contrato
       for (const hd of cat.holders) if (hd.category === 'novela_turca') adjustRelation(state, hd.id, st.id, 15, 'relação histórica de mercado');

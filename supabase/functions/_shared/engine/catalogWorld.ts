@@ -41,7 +41,7 @@ export function buildCatalogSnapshot(rows: { titles: Row[]; templates: Row[]; ri
       validFrom: str(r.valid_from)?.slice(0, 10) ?? null,
       validTo: str(r.valid_to)?.slice(0, 10) ?? null,
       exclusive: !!terms.exclusividade && terms.tipo !== 'relacionamento',
-      ...(terms.tipo === 'relacionamento' ? { kind: 'relacionamento' } : {}),
+      ...(terms.tipo === 'relacionamento' || terms.tipo === 'esporte' ? { kind: String(terms.tipo) } : {}),
     };
   }).sort((a, b) => `${a.productRef}${a.holderStationKey}`.localeCompare(`${b.productRef}${b.holderStationKey}`));
   const holders = rows.holders.map((r): CatalogHolderSnap => {

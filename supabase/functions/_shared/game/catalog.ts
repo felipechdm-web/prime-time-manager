@@ -6,7 +6,7 @@ import { ERAS } from '../engine/catalog/eras.ts';
 import { GENRES } from '../engine/catalog/genres.ts';
 import { MARKETS } from '../engine/catalog/markets.ts';
 
-export type CatalogTable = 'catalog_titles' | 'rights_holders' | 'schedule_templates' | 'historical_rights' | 'clubs' | 'club_fanbase';
+export type CatalogTable = 'catalog_titles' | 'rights_holders' | 'schedule_templates' | 'historical_rights' | 'clubs' | 'club_fanbase' | 'sports_competitions';
 export type Confidence = 'alta' | 'media' | 'baixa';
 export const CONFIDENCES: Confidence[] = ['alta', 'media', 'baixa'];
 export const CONFIDENCE_LABEL: Record<Confidence, string> = { alta: 'alta', media: 'média', baixa: 'baixa' };
@@ -39,6 +39,8 @@ export const TITLE_KINDS = ['novela', 'serie', 'minisserie', 'filme', 'pacote_fi
 export const HOLDER_CATEGORIES = [
   'novela_latina', 'novela_turca', 'asiatico', 'estudio_eua', 'formato', 'futebol_nacional', 'futebol_internacional', 'outros_esportes', 'produtora_br', 'emissora', 'infantil',
 ];
+export const COMPETITION_KINDS = ['liga', 'copa', 'evento', 'gp', 'luta'];
+export const COMPETITION_SCOPES = ['estadual', 'nacional', 'continental', 'mundial'];
 
 const review: FieldDef[] = [
   { name: 'confidence', label: 'Confiança', type: 'confidence', required: true, hint: 'alta, media ou baixa. Itens de confiança baixa só entram nas partidas depois de revisados.' },
@@ -110,6 +112,24 @@ export const CATALOG_TABLES: Record<CatalogTable, TableDef> = {
       { name: 'name', label: 'Nome', type: 'text', required: true },
       { name: 'country', label: 'País', type: 'text' },
       { name: 'rating_by_season', label: 'Força por temporada (JSON, 0-100)', type: 'json', hint: 'Ex.: {"2026":82}' },
+      { name: 'rivalries', label: 'Clássicos (JSON)', type: 'json', hint: 'Ex.: [{"club":"fluminense","weight":1.5,"name":"Fla-Flu"}]. Peso de 1 a 2 na audiência (estimativa de jogo).' },
+      ...review,
+    ],
+  },
+  sports_competitions: {
+    table: 'sports_competitions', label: 'Competições', keys: ['id'], title: (r) => String(r.name ?? r.id ?? ''),
+    fields: [
+      { name: 'id', label: 'Código', type: 'text', required: true, hint: 'Ex.: brasileirao_a, copa_do_brasil, formula1' },
+      { name: 'name', label: 'Nome', type: 'text', required: true },
+      { name: 'kind', label: 'Tipo', type: 'text', required: true, options: COMPETITION_KINDS },
+      { name: 'scope', label: 'Abrangência', type: 'text', required: true, options: COMPETITION_SCOPES },
+      { name: 'sport', label: 'Esporte', type: 'text', hint: 'futebol, automobilismo, luta...' },
+      { name: 'rights_holder_id', label: 'Quem vende os direitos', type: 'text', hint: 'Código do player (aba Players). Vazio quando há vários vendedores (ex.: Libra e LFU, no formato).' },
+      { name: 'eras', label: 'Eras', type: 'list', required: true, options: ERA_IDS, hint: `Valores: ${ERA_IDS.join(', ')}` },
+      { name: 'base_appeal', label: 'Apelo base (0-100, estimativa)', type: 'numeric', min: 0, max: 100 },
+      { name: 'format', label: 'Formato (JSON)', type: 'json', hint: 'Ex.: {"tipo":"pontos_corridos","clubes":20,"rodadas":38} ou {"tipo":"mata_mata","fases":[...]}' },
+      { name: 'calendar_rules', label: 'Calendário (JSON)', type: 'json', hint: 'Por temporada: início, fim, pausas, datas das fases e horários típicos ({"dias":"qua","hora":"21:30","tv_aberta":true})' },
+      { name: 'participants', label: 'Participantes (JSON)', type: 'json', hint: 'Temporada -> códigos de clubes; "generico:faixa" para times sem ficha' },
       ...review,
     ],
   },
@@ -126,7 +146,7 @@ export const CATALOG_TABLES: Record<CatalogTable, TableDef> = {
   },
 };
 
-export const CATALOG_TABLE_ORDER: CatalogTable[] = ['catalog_titles', 'rights_holders', 'schedule_templates', 'historical_rights', 'clubs', 'club_fanbase'];
+export const CATALOG_TABLE_ORDER: CatalogTable[] = ['catalog_titles', 'rights_holders', 'schedule_templates', 'historical_rights', 'sports_competitions', 'clubs', 'club_fanbase'];
 
 export function isCatalogTable(t: unknown): t is CatalogTable {
   return typeof t === 'string' && t in CATALOG_TABLES;

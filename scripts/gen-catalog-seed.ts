@@ -3,7 +3,7 @@
 //   node scripts/gen-catalog-seed.ts
 
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { buildLote1, buildLote1Ajustes, buildLote2a, buildLote2b, buildLote3, buildLote4 } from '../supabase/seeds/build.ts';
+import { buildLote1, buildLote1Ajustes, buildLote2a, buildLote2b, buildLote3, buildLote4, buildLote5 } from '../supabase/seeds/build.ts';
 
 const built = buildLote1();
 if (built.problems.length) {
@@ -67,3 +67,14 @@ writeFileSync('supabase/seeds/catalogo_2026_lote4.sql', lote4.sql, 'utf8');
 mkdirSync('supabase/seeds/catalogo_2026_lote4', { recursive: true });
 for (const [table, csv] of Object.entries(lote4.csv)) writeFileSync(`supabase/seeds/catalogo_2026_lote4/${table}.csv`, csv!, 'utf8');
 console.log('Lote 4 gerado:', lote4.counts);
+
+// lote 5 (Fase 6.4): esporte — players, competições de 2026, direitos na largada e clássicos
+const lote5 = buildLote5();
+if (lote5.problems.length) {
+  console.error(`O lote 5 tem ${lote5.problems.length} problema(s):\n- ${lote5.problems.join('\n- ')}`);
+  process.exit(1);
+}
+writeFileSync('supabase/seeds/catalogo_2026_lote5_esporte.sql', lote5.sql, 'utf8');
+mkdirSync('supabase/seeds/catalogo_2026_lote5_esporte', { recursive: true });
+for (const [table, csv] of Object.entries(lote5.csv)) writeFileSync(`supabase/seeds/catalogo_2026_lote5_esporte/${table}.csv`, csv!, 'utf8');
+console.log('Lote 5 (esporte) gerado:', lote5.counts);

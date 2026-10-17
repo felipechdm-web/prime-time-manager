@@ -172,6 +172,44 @@ test('lote 4: 40 clubes das Séries A e B, torcida em todas as praças e soma de
   }
 });
 
+test('lote 5 (esporte): competições de 2026, mapa de direitos da seção 8C.2, clássicos e nenhum atleta', async () => {
+  const { buildLote5 } = await import('../supabase/seeds/build.ts');
+  const L5 = await import('../supabase/seeds/catalogo_2026_lote5_esporte.ts');
+  const built = buildLote5();
+  assert.deepEqual(built.problems, []);
+  for (const table of ['rights_holders', 'sports_competitions', 'historical_rights'] as const) {
+    const back = csvToCatalogRows(table, built.csv[table]!);
+    assert.equal(back.rows.filter((r) => r.errors.length).length, 0, table);
+  }
+  // mapa da largada (seção 8C.2)
+  const holder = (comp: string) => L5.RIGHTS.filter((r) => r.product_ref === comp).map((r) => r.holder_station_key).sort();
+  assert.deepEqual(holder('brasileirao_a'), ['globo', 'globo', 'record']);
+  assert.equal(L5.RIGHTS.find((r) => r.product_ref === 'brasileirao_a' && r.holder_station_key === 'record')!.valid_to, '2027-12-31');
+  assert.deepEqual(holder('formula1'), ['globo']);
+  assert.deepEqual(holder('champions_league'), ['sbt']);
+  assert.deepEqual(holder('copa_do_mundo'), ['globo', 'sbt']);
+  assert.deepEqual(holder('libertadores'), ['globo']);
+  assert.deepEqual(holder('sul_americana'), ['sbt']);
+  const cdb = L5.COMPETITIONS.find((c) => c.id === 'copa_do_brasil')!;
+  const tender = (cdb.calendar_rules.concorrencias as { ciclo: string; abre: string }[])[0];
+  assert.equal(tender.ciclo, '2027-2030');
+  assert.ok(tender.abre <= '2026-01-05', 'a concorrência da Copa do Brasil está aberta na largada');
+  // nenhum atleta: participantes são clubes, seleções ou times genéricos
+  for (const c of L5.COMPETITIONS) for (const list of Object.values(c.participants)) for (const p of list) assert.match(p, /^([a-z0-9_]+|generico:[a-z_]+|selecao:[a-z_]+)$/);
+  assert.equal(built.counts.competicoes, 12);
+  assert.ok(built.rivalries.flamengo.some((r) => r.club === 'fluminense' && r.name === 'Fla-Flu'));
+  assert.ok(built.rivalries.fluminense.some((r) => r.club === 'flamengo'), 'clássico vale para os dois lados');
+});
+
+test('direitos esportivos no catálogo da partida não viram contrato de título (o motor esportivo cuida deles)', async () => {
+  const { buildCatalogSnapshot } = await import('../supabase/functions/_shared/engine/catalogWorld.ts');
+  const snap = buildCatalogSnapshot({
+    titles: [{ id: 'marimar', title_br: 'Marimar', kind: 'novela', rights_holder_id: 'televisa', game_attrs: {} }], templates: [], holders: [],
+    rights: [{ product_ref: 'formula1', holder_station_key: 'globo', terms: { tipo: 'esporte', exclusividade: 'exclusivo' }, valid_from: '2026-01-01', valid_to: '2028-12-31' }],
+  })!;
+  assert.equal(snap.rights[0].kind, 'esporte');
+});
+
 test('catalog-admin: só o dono edita; valida antes de gravar; aprova, corrige e apaga', async () => {
   const store = new MemoryStore();
   const admin = ctxWith(store, true);
