@@ -4,7 +4,9 @@
 import {
   applyIntentHandler, createGame, interpretHandler, liveModeHandler, mestreSceneHandler, resolveEventHandler, simulateHandler,
 } from '@game/handlers.ts';
-import { resolveLLMConfig } from '@game/llmConfig.ts';import { MemoryStore } from '@game/memoryStore.ts';
+import { resolveLLMConfig } from '@game/llmConfig.ts';
+import { MemoryStore } from '@game/memoryStore.ts';
+import { catalogBrowseHandler, negotiationCloseHandler, negotiationOpenHandler, negotiationTurnHandler, tenderResolveHandler } from '@game/negotiationHandlers.ts';
 import type { GameRow, HandlerCtx, SelectOpts } from '@game/types.ts';
 import { HttpError } from '@game/types.ts';
 import { validateMestrePlain } from '@game/validators.ts';
@@ -24,6 +26,11 @@ const HANDLERS: Record<string, HandlerFn> = {
   'resolve-event': resolveEventHandler,
   'live-mode': liveModeHandler,
   'interpret-free-action': interpretHandler,
+  'catalog-browse': catalogBrowseHandler,
+  'negotiation-open': negotiationOpenHandler,
+  'negotiation-turn': negotiationTurnHandler,
+  'negotiation-close': negotiationCloseHandler,
+  'tender-resolve': tenderResolveHandler,
 };
 
 function uuid(): string {

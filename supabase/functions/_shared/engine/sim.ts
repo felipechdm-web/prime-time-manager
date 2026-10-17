@@ -10,6 +10,7 @@ import { applyDelayed, drawWeekEvents, expireEvents, fireEvent, progressArcs, ta
 import { annualScore, computeKpis, verdictFor } from './kpis.ts';
 import { computeLiveMoments } from './live.ts';
 import { devProgress, refreshOffers, resolveAuctions } from './market.ts';
+import { processContracts } from './negotiation.ts';
 import { money } from './money.ts';
 import { boletimFallback, dayFallback, evaluationFallback } from './narrative.ts';
 import { buildWeekReport, PA, programResultsFromAcc } from './report.ts';
@@ -771,6 +772,11 @@ export function startWeek(state: GameState, out: SimOutputs, opts: { quiet?: boo
     pushTimeline(state, `"${p.title}" ficou pronto para estrear.`, 'programa');
   }
   for (const n of resolveAuctions(state)) inbox(state, { fromNpc: 'npc_comercial', subject: 'Resultado do leilão', body: n, requiresAction: false, eventId: null, kind: 'mensagem' });
+  // contratos de direitos (v2): parcelas, horário prometido e vencimentos
+  if (state.rightsContracts?.length) {
+    const rc = processContracts(state);
+    for (const n of rc.notes) inbox(state, { fromNpc: 'npc_juridico', subject: 'Contratos de direitos', body: n, requiresAction: false, eventId: null, kind: 'mensagem' });
+  }
   // contratos
   for (const c of state.contracts) {
     if (c.status !== 'active') continue;

@@ -58,7 +58,18 @@ const migration = readdirSync('supabase/migrations')
   .join('\n\n');
 writeFileSync(
   'supabase/setup_completo.sql',
-  `-- Prime Time Manager — instalação completa (migração + catálogo).\n-- Cole este arquivo inteiro no SQL Editor do Supabase e clique em "Run".\n-- Pode ser executado de novo sem problemas (atualiza o catálogo).\n\n${migration}\n\n${seed}`,
+  `-- Prime Time Manager — instalação completa (migração + catálogo).\n-- Cole este arquivo inteiro no SQL Editor do Supabase e clique em "Run".\n-- Pode ser executado de novo sem problemas (atualiza o catálogo).\n-- Se o Supabase acusar erro de texto cortado (o arquivo é grande), use as duas partes:\n-- setup_parte1_estrutura.sql e depois setup_parte2_catalogo.sql.\n\n${migration}\n\n${seed}`,
+  'utf8',
+);
+// o mesmo conteúdo em duas partes menores: colar um arquivo muito grande no SQL Editor pode chegar cortado
+writeFileSync(
+  'supabase/setup_parte1_estrutura.sql',
+  `-- Prime Time Manager — instalação, PARTE 1 de 2: tabelas, segurança e funções (todas as migrações).\n-- Cole no SQL Editor do Supabase e clique em "Run". Depois rode a PARTE 2 (setup_parte2_catalogo.sql).\n-- Pode ser executado de novo sem problemas.\n\n${migration}\n`,
+  'utf8',
+);
+writeFileSync(
+  'supabase/setup_parte2_catalogo.sql',
+  `-- Prime Time Manager — instalação, PARTE 2 de 2: catálogo do jogo (era, gêneros, eventos, personagens, praças).\n-- Rode DEPOIS da parte 1. Pode ser executado de novo sem problemas (atualiza o catálogo).\n\n${seed}`,
   'utf8',
 );
 

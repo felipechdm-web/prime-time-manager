@@ -2,7 +2,7 @@
 // gênero de jogo de cada título, exclusividades e divergências. Funções puras, sem I/O.
 
 import { GENRES } from './catalog/genres.ts';
-import type { CatalogSlotSnap, CatalogSnapshot, CatalogTitleSnap, Divergence, GameState, GenreId } from './types.ts';
+import type { CatalogHolderSnap, CatalogSlotSnap, CatalogSnapshot, CatalogTitleSnap, Divergence, GameState, GenreId } from './types.ts';
 
 type Row = Record<string, unknown>;
 const str = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? v.trim() : null);
@@ -41,9 +41,21 @@ export function buildCatalogSnapshot(rows: { titles: Row[]; templates: Row[]; ri
       validFrom: str(r.valid_from)?.slice(0, 10) ?? null,
       validTo: str(r.valid_to)?.slice(0, 10) ?? null,
       exclusive: !!terms.exclusividade && terms.tipo !== 'relacionamento',
+      ...(terms.tipo === 'relacionamento' ? { kind: 'relacionamento' } : {}),
     };
   }).sort((a, b) => `${a.productRef}${a.holderStationKey}`.localeCompare(`${b.productRef}${b.holderStationKey}`));
-  const holders = rows.holders.map((r) => ({ id: String(r.id), name: String(r.name ?? r.id) })).sort((a, b) => a.id.localeCompare(b.id));
+  const holders = rows.holders.map((r): CatalogHolderSnap => {
+    const profile = (r.profile && typeof r.profile === 'object' ? r.profile : {}) as Row;
+    const rep = (r.representative_seed && typeof r.representative_seed === 'object' ? r.representative_seed : null) as Row | null;
+    const style = ['duro', 'relacional', 'leiloeiro'].includes(String(profile.estilo)) ? profile.estilo as CatalogHolderSnap['style'] : undefined;
+    return {
+      id: String(r.id), name: String(r.name ?? r.id),
+      ...(str(r.category) ? { category: str(r.category)! } : {}),
+      ...(style ? { style } : {}),
+      ...(Array.isArray(profile.prioridades) ? { priorities: (profile.prioridades as unknown[]).map(String) } : {}),
+      ...(rep && str(rep.nome) ? { representative: { nome: String(rep.nome), cargo: String(rep.cargo ?? ''), estilo: String(rep.estilo ?? '') } } : {}),
+    };
+  }).sort((a, b) => a.id.localeCompare(b.id));
   if (!titles.length && !grids.length) return null;
   return { titles, grids, rights, holders };
 }

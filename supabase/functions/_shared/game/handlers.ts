@@ -17,6 +17,7 @@ import type { SimOutputs } from '../engine/sim.ts';
 import { getProgram, npcById, npcByRole, playerStation, stationById } from '../engine/state.ts';
 import type { Background, CatalogSnapshot, Difficulty, EraId, GameState, ScenarioId, Universe, WeekReport } from '../engine/types.ts';
 import { buildCatalogSnapshot } from '../engine/catalogWorld.ts';
+import { syncRights } from './rightsSync.ts';
 import { DAY_NAMES, formatDate } from '../engine/time.ts';
 import { validateSchedule } from '../engine/validate.ts';
 import { biaAnswer, interviewFallback, meetingOpening, meetingReply } from './fallbackScenes.ts';
@@ -36,7 +37,7 @@ export const MEETING_TYPES: Record<string, { label: string; cost: number; turns:
 };
 
 // ===== utilidades =====
-async function loadGame(ctx: HandlerCtx, gameId: string): Promise<GameRow> {
+export async function loadGame(ctx: HandlerCtx, gameId: string): Promise<GameRow> {
   if (!gameId || typeof gameId !== 'string') throw new HttpError(400, 'gameId obrigatório');
   const row = await ctx.store.getGame(gameId);
   if (!row) throw new HttpError(404, 'Partida não encontrada');
@@ -44,19 +45,19 @@ async function loadGame(ctx: HandlerCtx, gameId: string): Promise<GameRow> {
   return row;
 }
 
-function snapshot(state: GameState): Record<string, string> {
+export function snapshot(state: GameState): Record<string, string> {
   const out: Record<string, string> = {};
   for (const [k, v] of Object.entries(state)) out[k] = JSON.stringify(v);
   return out;
 }
 
-function diffPatch(before: Record<string, string>, state: GameState): Partial<GameState> {
+export function diffPatch(before: Record<string, string>, state: GameState): Partial<GameState> {
   const patch: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(state)) if (before[k] !== JSON.stringify(v)) patch[k] = v;
   return patch as Partial<GameState>;
 }
 
-async function saveGame(ctx: HandlerCtx, row: GameRow, state: GameState): Promise<number> {
+export async function saveGame(ctx: HandlerCtx, row: GameRow, state: GameState): Promise<number> {
   const version = row.version + 1;
   state.meta.version = version;
   // a caixa de saída não vai para o estado salvo (senão seria regravada na próxima ação);
@@ -81,7 +82,7 @@ async function saveGame(ctx: HandlerCtx, row: GameRow, state: GameState): Promis
   return version;
 }
 
-async function flushInbox(ctx: HandlerCtx, gameId: string, state: GameState): Promise<void> {
+export async function flushInbox(ctx: HandlerCtx, gameId: string, state: GameState): Promise<void> {
   await flushDivergences(ctx, gameId, state);
   if (!state.pendingInbox.length) return;
   const rows = state.pendingInbox.map((d, i) => ({
@@ -238,6 +239,7 @@ export async function createGame(ctx: HandlerCtx, body: Record<string, unknown>)
   await ctx.store.insert('messages', [{ conversation_id: conv[0]?.id, role: 'mestre', content: scene.output, created_at: ctx.now().toISOString() }]);
   await persistOutputs(ctx, id, state, outputs);
   await ctx.store.updateGame(id, { state, version: 2 }, 1);
+  await syncRights(ctx, id, state); // exclusividades reais da largada como contratos ativos (seção 8A.6)
   return { gameId: id, interview: scene.output };
 }
 
@@ -292,6 +294,7 @@ export async function simulateHandler(ctx: HandlerCtx, body: Record<string, unkn
     // fim de jogo: carreira encerrada
   }
   await saveGame(ctx, row, state);
+  if (state.rightsContracts?.length) await syncRights(ctx, row.id, state); // parcelas, multas e vencimentos da semana
   const summary = { weekClosed: false, reports: [] as { id: string; kind: string; week: number; day: number | null; data: unknown }[], notes: [] as string[], endGame: null as SimOutputs['endGame'], daysSimulated: [] as number[] };
   for (const o of merged) {
     const { reportIds } = await persistOutputs(ctx, row.id, state, o);

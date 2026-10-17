@@ -17,7 +17,9 @@ export type LLMFunction =
   | 'bia'
   | 'live-mode'
   | 'interpret-free-action'
-  | 'campaign-summary';
+  | 'campaign-summary'
+  | 'negociacao'
+  | 'negociacao-interpretar';
 
 export interface FnDefault {
   label: string;
@@ -37,6 +39,8 @@ export const LLM_FUNCTIONS: Record<LLMFunction, FnDefault> = {
   'live-mode': { label: 'Narração ao vivo', maxTokens: 500 },
   'interpret-free-action': { label: 'Interpretar ação livre', maxTokens: 300 },
   'campaign-summary': { label: 'Resumo mensal da campanha', maxTokens: 400 },
+  negociacao: { label: 'Negociação (fala do representante, por rodada)', maxTokens: 700 },
+  'negociacao-interpretar': { label: 'Negociação (ler a proposta do jogador)', maxTokens: 300 },
 };
 
 export interface FnConfig {

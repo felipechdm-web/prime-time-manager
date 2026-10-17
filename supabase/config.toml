@@ -27,3 +27,18 @@ verify_jwt = false
 
 [functions.catalog-admin]
 verify_jwt = false
+
+[functions.catalog-browse]
+verify_jwt = false
+
+[functions.negotiation-open]
+verify_jwt = false
+
+[functions.negotiation-turn]
+verify_jwt = false
+
+[functions.negotiation-close]
+verify_jwt = false
+
+[functions.tender-resolve]
+verify_jwt = false

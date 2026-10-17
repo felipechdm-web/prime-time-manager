@@ -465,8 +465,59 @@ export interface CatalogSlotSnap {
 export interface CatalogSnapshot {
   titles: CatalogTitleSnap[];
   grids: { stationKey: string; referenceMonth: string; slots: CatalogSlotSnap[] }[];
-  rights: { productRef: string; holderStationKey: string; validFrom: string | null; validTo: string | null; exclusive: boolean }[];
-  holders: { id: string; name: string }[];
+  rights: { productRef: string; holderStationKey: string; validFrom: string | null; validTo: string | null; exclusive: boolean; kind?: string }[];
+  holders: CatalogHolderSnap[];
+}
+
+// player de direitos (Fase 6.3): perfil de negociação e representante fictício vêm do catálogo
+export interface CatalogHolderSnap {
+  id: string;
+  name: string;
+  category?: string;
+  style?: NegStyle;
+  priorities?: string[];
+  representative?: { nome: string; cargo: string; estilo: string } | null;
+}
+
+// ===== Mesa de Negociação (v2, seção 8B) =====
+export type NegStyle = 'duro' | 'relacional' | 'leiloeiro';
+
+// o que está na mesa (term sheet, seção 8B.2). Valores em R$ de 2026.
+export interface TermSheet {
+  valor: number; // valor total do contrato
+  parcelas: number; // 1 a 4
+  anos: number; // duração do contrato, 1 a 5
+  exibicoes: number; // total de exibições (enlatados e filmes) ou programas (formatos)
+  exclusividade: 'exclusivo' | 'compartilhado';
+  plataformas: 'tv_aberta' | 'tv_aberta_streaming';
+  faixa: BandId; // horário prometido (exposição)
+  preferencia_renovacao: boolean;
+}
+
+export interface HolderRelation {
+  score: number; // 0 a 100
+  distrustUntil?: string | null; // blefe descoberto: desconfiança até esta data
+  history?: { date: string; delta: number; reason: string }[];
+}
+
+export interface ContractPayment { date: string; amount: number; paid: boolean }
+export interface ContractObligation { kind: 'faixa'; band: BandId; from: string; met: number; missed: number }
+
+export interface RightsContract {
+  id: string;
+  stationId: string;
+  holderId: string | null;
+  productRef: string;
+  label: string; // nome do produto para as telas
+  origin: 'largada' | 'negociacao' | 'concorrencia';
+  terms: Partial<TermSheet> & { escopo?: string };
+  startDate: string | null;
+  endDate: string | null;
+  payments: ContractPayment[];
+  obligations: ContractObligation[];
+  status: 'ativo' | 'encerrado' | 'rescindido' | 'inadimplente';
+  programId?: string | null;
+  negotiationId?: string | null;
 }
 
 export interface Divergence {
@@ -630,6 +681,8 @@ export interface GameState {
   catalog?: CatalogSnapshot; // v2: catálogo real aprovado no momento da criação (só no modo real com Supabase)
   divergences?: Divergence[]; // v2: onde a partida se afastou da história real
   pendingDivergences?: Divergence[]; // gravadas na tabela divergences pelo servidor, como a caixa de saída
+  rightsContracts?: RightsContract[]; // v2: contratos de direitos (largada e negociados); espelhados em rights_contracts
+  holderRel?: Record<string, Record<string, HolderRelation>>; // v2: relacionamento player -> emissora (0 a 100)
 }
 
 export interface InboxDraft {
