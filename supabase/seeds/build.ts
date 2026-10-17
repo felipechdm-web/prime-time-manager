@@ -8,6 +8,9 @@ import { BATCH, GRIDS, HOLDERS, REFERENCE_MONTH, RIGHTS, TITLES } from './catalo
 import type { GridSeed, HolderSeed, RightSeed, TitleSeed } from './catalogo_2026_lote1.ts';
 import * as L2A from './catalogo_2026_lote2a.ts';
 import * as L2B from './catalogo_2026_lote2b.ts';
+import * as L3 from './catalogo_2026_lote3.ts';
+import { parseDays } from '../functions/_shared/engine/catalogWorld.ts';
+import { clockToSlot } from '../functions/_shared/engine/time.ts';
 
 const ERA = 'now';
 
@@ -125,6 +128,78 @@ export const LOTE2B: BatchSeed = { batch: L2B.BATCH, source: 'catalogo_2026_lote
 
 export function buildLote2b(): BuiltSeed {
   return buildBatch(LOTE2B);
+}
+
+// Faixas da grade que se sobrepõem no mesmo dia (o dia do jogo vai das 6h às 6h; faixa que passa das 6h é cortada)
+export function gridProblems(g: GridSeed): string[] {
+  const out: string[] = [];
+  const taken: Map<number, string>[] = Array.from({ length: 7 }, () => new Map());
+  g.slots.forEach((sl, i) => {
+    const start = clockToSlot(sl.inicio);
+    const raw = (clockToSlot(sl.fim) - start + 96) % 96;
+    if (raw > 96 - start) out.push(`grade ${g.station_key} faixa ${i + 1} (${sl.titulo}): passa das 6h e seria cortada`);
+    const len = Math.min(raw, 96 - start);
+    if (len <= 0) out.push(`grade ${g.station_key} faixa ${i + 1} (${sl.titulo}): duração zero`);
+    const days = parseDays(sl.dias);
+    if (!days.length) out.push(`grade ${g.station_key} faixa ${i + 1} (${sl.titulo}): dias "${sl.dias}" inválidos`);
+    for (const d of days) for (let k = start; k < start + len; k++) {
+      const prev = taken[d].get(k);
+      if (prev) { out.push(`grade ${g.station_key} faixa ${i + 1} (${sl.titulo}) se sobrepõe a "${prev}" (dia ${d}, ${sl.inicio})`); return; }
+      taken[d].set(k, sl.titulo);
+    }
+  });
+  return out;
+}
+
+export const LOTE3_REPLACES = ['globo', 'record', 'band']; // grades do lote 1 substituídas pelas do lote 3
+
+// Lote 3: grades de janeiro de 2026 das seis emissoras (SBT segue com a do lote 1) e correções de itens do lote 1.
+export function buildLote3(): BuiltSeed {
+  const base = buildBatch({ batch: L3.BATCH, source: 'catalogo_2026_lote3.ts', holders: [], titles: [], grids: L3.GRIDS, rights: [], previous: [LOTE1, LOTE2A, LOTE2B] });
+  const problems = [...base.problems, ...L3.GRIDS.flatMap(gridProblems)];
+  for (const g of L3.GRIDS) {
+    const n = new Set(g.slots.map((s) => s.titulo)).size;
+    if (n < 30 || n > 50) problems.push(`grade ${g.station_key}: ${n} programas (o combinado é de 30 a 50)`);
+  }
+  const allTitles = new Set([...TITLES, ...L2A.TITLES, ...L2B.TITLES].map((t) => t.id));
+  const fixTitles = L3.CORRECOES.titles.map((c) => {
+    if (!allTitles.has(c.id)) problems.push(`correção: título ${c.id} não existe`);
+    const n = normalizeCatalogRow('catalog_titles', { ...c, title_br: 'x', kind: 'novela', confidence: c.confidence ?? 'media' });
+    for (const e of n.errors) problems.push(`correção ${c.id}: ${e}`);
+    const sets = Object.entries(c).filter(([k]) => k !== 'id').map(([k, v]) => `${k} = ${q(v)}`);
+    return `update public.catalog_titles set ${sets.join(', ')}, approved = false, batch = ${q(L3.BATCH)}, updated_at = now() where id = ${q(c.id)};`;
+  });
+  const fixRights = L3.CORRECOES.rights.map((c) => {
+    if (!RIGHTS.some((r) => r.id === c.id)) problems.push(`correção: direito ${c.id} não existe`);
+    return `update public.historical_rights set valid_to = ${q(c.valid_to)}, notes = ${q(c.notes)}, approved = false, batch = ${q(L3.BATCH)}, updated_at = now() where id = ${c.id};`;
+  });
+  const grids = base.rows.schedule_templates;
+  const sql = `-- Prime Time Manager — catálogo real, era atual (2026), ${L3.BATCH}: grades de janeiro de 2026.
+-- Gerado por scripts/gen-catalog-seed.ts a partir de supabase/seeds/catalogo_2026_lote3.ts. Não edite à mão.
+-- 1) Substitui as grades de janeiro do lote 1 da Globo, da Record e da Band (as do lote 1 eram curtas) e inclui
+--    RedeTV! e Cultura. A grade do SBT do lote 1 continua valendo. Tudo entra como NÃO aprovado.
+--    Atenção: até você aprovar as grades novas, partidas novas usam a grade genérica nessas cinco emissoras.
+-- 2) Correções em itens do lote 1 (Mãe, Guerra das Rosas, Força de Mulher e o direito de Mãe): voltam para pendente.
+-- Rodar de novo não duplica nada (as correções são reaplicadas e continuam pendentes até você aprovar).
+
+${CATALOG_GUARD}
+
+begin;
+
+delete from public.schedule_templates
+where era_id = '${ERA}' and reference_month = '2026-01' and station_key in (${LOTE3_REPLACES.map((x) => q(x)).join(', ')}) and batch = ${q(BATCH)};
+${insertSql('schedule_templates', grids, '(era_id, station_key, reference_month)')}
+${fixTitles.join('\n')}
+${fixRights.join('\n')}
+
+commit;
+`;
+  return {
+    problems, sql,
+    csv: { schedule_templates: catalogRowsToCSV('schedule_templates', grids) },
+    counts: { grades: grids.length, faixas: L3.GRIDS.reduce((n, g) => n + g.slots.length, 0), programas: L3.GRIDS.reduce((n, g) => n + new Set(g.slots.map((s) => s.titulo)).size, 0), correcoes: fixTitles.length + fixRights.length },
+    rows: { rights_holders: [], catalog_titles: [], schedule_templates: grids, historical_rights: [] },
+  };
 }
 
 export function buildBatch(seed: BatchSeed): BuiltSeed {

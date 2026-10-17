@@ -133,6 +133,30 @@ test('lote 2b de 2026: filmes e formatos válidos; com os três lotes o catálog
   assert.equal(exclusiveRight(state, auto, '2026-01-05')?.stationKey, 'globo');
 });
 
+test('lote 3: grades de janeiro das seis emissoras, sem faixas sobrepostas, 30 a 50 programas e correções pendentes', async () => {
+  const { buildLote1, buildLote3, gridProblems, LOTE3_REPLACES } = await import('../supabase/seeds/build.ts');
+  const L3 = await import('../supabase/seeds/catalogo_2026_lote3.ts');
+  const built = buildLote3();
+  assert.deepEqual(built.problems, []);
+  const keys = [...L3.GRIDS.map((g) => g.station_key), ...buildLote1().rows.schedule_templates.map((g) => String(g.station_key)).filter((k) => !LOTE3_REPLACES.includes(k))];
+  assert.deepEqual([...new Set(keys)].sort(), ['band', 'cultura', 'globo', 'record', 'redetv', 'sbt']);
+  for (const g of L3.GRIDS) {
+    assert.ok(g.notes.includes('http'), `${g.station_key}: nota sem fonte`);
+    assert.equal(g.reference_month, '2026-01');
+  }
+  // a checagem de sobreposição pega faixas que se cruzam
+  const ruim = gridProblems({ station_key: 'x', confidence: 'baixa', notes: '', slots: [
+    { dias: 'seg', inicio: '20:00', fim: '21:00', titulo: 'A', genero: 'telejornal' },
+    { dias: 'seg-sex', inicio: '20:30', fim: '21:30', titulo: 'B', genero: 'novela_21h' },
+    { dias: 'sab', inicio: '05:00', fim: '07:00', titulo: 'C', genero: 'religioso' },
+  ] });
+  assert.ok(ruim.some((p) => p.includes('se sobrepõe')));
+  assert.ok(ruim.some((p) => p.includes('passa das 6h')));
+  // correções voltam para pendente; grades do lote 1 substituídas só se ainda forem do lote 1
+  assert.match(built.sql, /approved = false/);
+  assert.match(built.sql, /station_key in \('globo', 'record', 'band'\) and batch = '2026-lote1'/);
+});
+
 test('catalog-admin: só o dono edita; valida antes de gravar; aprova, corrige e apaga', async () => {
   const store = new MemoryStore();
   const admin = ctxWith(store, true);
