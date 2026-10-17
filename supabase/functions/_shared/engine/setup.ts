@@ -9,7 +9,7 @@ import { FICTIONAL_STATIONS, personName, PLAYER_DEFAULT_STATION, programTitle, s
 import { FIXED_NPCS, talentArchetypeForGenre } from './catalog/npcs.ts';
 import { leaseRate } from './commercial.ts';
 import { clamp, Rng, rngFor } from './rng.ts';
-import { emptyWeek, ensureSystemPrograms, habitKeyFor, placeBlock } from './schedule.ts';
+import { emptyWeek, ensureSystemPrograms, habitKeyFor, placeBlock, programAirings } from './schedule.ts';
 import { nextId } from './state.ts';
 import { availableAt, catalogGenre, exclusiveRight, parseDays, pickGrid, titleById } from './catalogWorld.ts';
 import type {
@@ -475,6 +475,25 @@ function playerCatalogAcervo(ctx: Ctx, ps: Station): void {
   }
 }
 
+// A grade do jogador nunca começa com programa esgotado. O aquecimento (3 semanas simuladas antes da largada) mais as
+// 2 primeiras semanas de jogo precisam caber nos episódios que restam: séries curtas exibidas várias vezes por semana
+// (ex.: série nacional de 10 a 12 episódios na grade da líder) acabavam antes da largada e travavam o "Colocar no ar".
+const RUNWAY_WEEKS = 5;
+function ensurePlayerRunway(state: GameState, ps: Station): void {
+  const week = state.schedules[ps.id];
+  if (!week) return;
+  for (const p of state.programs) {
+    if (p.stationId !== ps.id || p.status !== 'on_air' || p.episodes.total === null) continue;
+    const weekly = programAirings(week, p.id).length;
+    if (!weekly) continue;
+    const need = p.episodes.aired + weekly * RUNWAY_WEEKS;
+    if (p.episodes.total < need) {
+      p.episodes.total = need;
+      p.episodes.planned = need;
+    }
+  }
+}
+
 const RESERVE_GENRES: Record<ArchetypeId, string[]> = {
   hegemonica: ['novela_21h', 'serie_nacional', 'humoristico', 'reality|game_show', 'novela_19h'],
   popular_auditorio: ['auditorio', 'game_show', 'novela_18h', 'talent_show|game_show'],
@@ -786,6 +805,7 @@ export function createWorld(input: NewGameInput): GameState {
   }
   playerExtras(ctx, playerSt, scenario);
   if (state.catalog) playerCatalogAcervo(ctx, playerSt);
+  ensurePlayerRunway(state, playerSt);
   ensureSystemPrograms(state);
 
   // hábito: assinatura do horário atual

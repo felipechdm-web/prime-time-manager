@@ -154,3 +154,24 @@ test('assumir uma emissora real (modo real)', () => {
   assert.equal(ps.name, 'SBT');
   assert.equal(s.meta.scenario, 'vice_ambiciosa');
 });
+
+
+test('nenhuma partida começa com a grade bloqueada (emissoras reais e fictícia, várias sementes)', () => {
+  // antes da correção, a Globo (líder) começava travada em ~1 de cada 5 partidas: uma série nacional curta, exibida
+  // várias vezes por semana, acabava nas 3 semanas de aquecimento e ficava "encerrada" na grade (sementes 5, 6 e 8)
+  const cases: [NewGameInput['station'], NewGameInput['scenario'], NewGameInput['universe']][] = [
+    [{ mode: 'real', realKey: 'globo' }, 'lider_ameacada', 'real'],
+    [{ mode: 'real', realKey: 'record' }, 'vice_ambiciosa', 'real'],
+    [{ mode: 'real', realKey: 'sbt' }, 'vice_ambiciosa', 'real'],
+    [{ mode: 'real', realKey: 'band' }, 'vice_ambiciosa', 'real'],
+    [{ mode: 'fictional', name: 'TV Horizonte' }, 'emissora_crise', 'real'],
+    [{ mode: 'fictional', name: 'TV Horizonte' }, 'canal_pago', 'fictional'],
+  ];
+  for (const [station, scenario, universe] of cases) {
+    for (const seed of [5, 6, 8, 13]) {
+      const { state } = newGame({ universe, era: 'now', startYear: 2026, scenario, difficulty: 'diretor', seed, player: { name: 'X', background: 'jornalista', pronoun: 'o' }, station });
+      const blocks = validateSchedule(state).issues.filter((i) => i.level === 'block');
+      assert.deepEqual(blocks.map((b) => b.text), [], `${station.realKey ?? station.name}/${scenario}/semente ${seed}`);
+    }
+  }
+});
