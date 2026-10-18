@@ -9,6 +9,9 @@ import type { NegPublic } from '@engine/negotiation.ts';
 import { applyIntent } from '@engine/intents.ts';
 import type { Intent } from '@engine/intents.ts';
 import { sublicenseQuote } from '@engine/sportsTv.ts';
+import { TENDER_REASONS } from '@engine/tenders.ts';
+import type { TenderMeetingPub } from '@engine/tenders.ts';
+import type { TenderOffer, TenderPublic } from '@engine/types.ts';
 import { formatDate } from '@engine/time.ts';
 import type { BandId, GameState, GenreId, RightsContract, TermSheet } from '@engine/types.ts';
 import { NEG_AGENDA_COST } from '@game/negotiationHandlers.ts';
@@ -41,6 +44,7 @@ const BANDS: { id: BandId; label: string }[] = [
 const DECISION: Record<string, { label: string; tone: 'good' | 'bad' | 'warn' | 'accent' | 'neutral' }> = {
   abertura: { label: 'abertura', tone: 'neutral' }, contraproposta: { label: 'contraproposta', tone: 'warn' }, recusa: { label: 'recusa', tone: 'bad' },
   aceite: { label: 'acordo', tone: 'good' }, fim: { label: 'sem acordo', tone: 'bad' }, pausa: { label: 'vamos pensar', tone: 'accent' }, levantou: { label: 'levantou da mesa', tone: 'bad' },
+  avaliacao: { label: 'retorno sobre o projeto', tone: 'accent' }, envelope: { label: 'envelope entregue', tone: 'good' },
 };
 const STATUS: Record<string, { label: string; tone: 'good' | 'bad' | 'warn' | 'accent' | 'neutral' }> = {
   aberta: { label: 'em andamento', tone: 'accent' }, pausada: { label: 'pensando', tone: 'warn' }, fechada: { label: 'acordo', tone: 'good' }, fracassada: { label: 'sem acordo', tone: 'bad' },
@@ -56,8 +60,8 @@ export function Direitos({ gameId, state }: ScreenProps) {
   const route = useRoute();
   const neg = route.query.get('neg');
   const titleParam = route.query.get('title');
-  const tabParam = route.query.get('tab') as 'mercado' | 'negociacoes' | 'contratos' | null;
-  const [tab, setTab] = useState<'mercado' | 'negociacoes' | 'contratos'>(tabParam ?? 'mercado');
+  const tabParam = route.query.get('tab') as 'mercado' | 'negociacoes' | 'contratos' | 'concorrencias' | null;
+  const [tab, setTab] = useState<'mercado' | 'negociacoes' | 'contratos' | 'concorrencias'>(tabParam ?? 'mercado');
   // links diretos (?title= vem do Acervo; ?tab= de outras telas) escolhem a aba
   useEffect(() => {
     if (titleParam) setTab('mercado');
@@ -71,9 +75,15 @@ export function Direitos({ gameId, state }: ScreenProps) {
         <h1 className="text-xl font-black sm:text-2xl">Mercado de Direitos</h1>
         <p className="text-sm text-muted">Reuniões de negócios com os donos dos títulos reais. Cada reunião custa {NEG_AGENDA_COST} pontos de agenda (você tem {state.agenda.points}). O representante conversa; o preço e o aceite seguem as regras do mercado.</p>
       </div>
-      <Tabs value={tab} onChange={setTab} items={[{ id: 'mercado', label: 'Vitrine' }, { id: 'negociacoes', label: 'Negociações' }, { id: 'contratos', label: `Contratos (${ownContracts.filter((c) => c.status === 'ativo').length})` }]} />
+      <Tabs value={tab} onChange={setTab} items={[
+        { id: 'mercado', label: 'Vitrine' },
+        { id: 'negociacoes', label: 'Negociações' },
+        ...(state.tenders?.length ? [{ id: 'concorrencias' as const, label: `Concorrências (${state.tenders.filter((t) => t.status !== 'encerrada').length})` }] : []),
+        { id: 'contratos', label: `Contratos (${ownContracts.filter((c) => c.status === 'ativo').length})` },
+      ]} />
       {tab === 'mercado' && <Vitrine gameId={gameId} state={state} autoTitle={titleParam} />}
       {tab === 'negociacoes' && <Negociacoes gameId={gameId} state={state} />}
+      {tab === 'concorrencias' && <Concorrencias gameId={gameId} state={state} />}
       {tab === 'contratos' && <Contratos gameId={gameId} state={state} />}
     </div>
   );
@@ -313,6 +323,7 @@ function Mesa({ gameId, state, negotiationId }: ScreenProps & { negotiationId: s
 
   if (negQ.isLoading) return <div className="p-6 text-center"><Spinner /></div>;
   if (!pub || !n) return <div className="p-6"><Empty title="Negociação não encontrada"><Button onClick={() => go(`g/${gameId}/direitos`)}>Voltar</Button></Empty></div>;
+  if ((pub as unknown as { kind: string }).kind === 'concorrencia') return <TenderMesa gameId={gameId} state={state} negotiationId={negotiationId} pub={pub as unknown as TenderMeetingPub} rounds={rounds} loading={roundsQ.isLoading} />;
   const open = pub.status === 'aberta' && state.meta.status === 'active';
   const relation = pub.kind === 'relacionamento';
   const patienceTone = pub.patiencePct > 66 ? 'good' : pub.patiencePct > 33 ? 'warn' : 'bad';
@@ -522,6 +533,220 @@ function Contratos({ gameId, state }: ScreenProps) {
         <p className="text-xs text-muted">Enquanto valerem, esses produtos ficam travados para você. Perto do vencimento, uma reunião de relacionamento com o player ajuda na renovação.</p>
         <div className="grid gap-2 md:grid-cols-2">{others.map((c) => <ContractCard key={c.id} c={c} own={false} />)}</div>
       </section>
+    </div>
+  );
+}
+
+// ===== concorrências esportivas (Fase 6.4): envelope fechado, reunião na Mesa e abertura =====
+const TENDER_STATUS: Record<string, { label: string; tone: 'good' | 'bad' | 'warn' | 'accent' | 'neutral' }> = {
+  aberta: { label: 'recebendo envelopes', tone: 'accent' }, a_resolver: { label: 'prazo encerrado', tone: 'warn' }, encerrada: { label: 'encerrada', tone: 'neutral' },
+};
+const FAIXA: Record<string, string> = { nobre: 'jogos principais no horário nobre', tarde: 'jogos principais à tarde', qualquer: 'horário a combinar' };
+const PROJECT_TAGS = ['exposicao_nobre', 'audiencia_projetada', 'parceria_longa', 'pacote_volume'];
+
+function offerLine(era: ScreenProps['state']['meta']['era'], o: TenderOffer): string {
+  return `${moneyEra(era, o.valor)} · ${o.jogos} jogo${o.jogos > 1 ? 's' : ''} por rodada na TV aberta · ${FAIXA[o.faixa] ?? o.faixa}${o.streaming ? ' · também no streaming' : ''} · ${o.parcelas === 1 ? 'à vista' : `${o.parcelas} parcelas anuais`}`;
+}
+
+function BidForm({ era, value, onChange }: { era: ScreenProps['state']['meta']['era']; value: TenderOffer; onChange: (o: TenderOffer) => void }) {
+  const set = <K extends keyof TenderOffer>(k: K, v: TenderOffer[K]) => onChange({ ...value, [k]: v });
+  return (
+    <div className="space-y-2">
+      <Field label="Valor total do ciclo (R$ milhões)" hint={moneyEra(era, value.valor)}>
+        <input className={inputClass} inputMode="decimal" value={(value.valor / 1e6).toLocaleString('pt-BR', { maximumFractionDigits: 3 })} onChange={(e) => { const v = parseFloat(e.target.value.replace(/\./g, '').replace(',', '.')); if (isFinite(v)) set('valor', Math.round(v * 1e6)); }} />
+      </Field>
+      <div className="grid grid-cols-2 gap-2">
+        <Field label="Jogos por rodada"><select className={inputClass} value={value.jogos} onChange={(e) => set('jogos', Number(e.target.value))}><option value={1}>1 na TV aberta</option><option value={2}>2 na TV aberta</option></select></Field>
+        <Field label="Parcelas"><select className={inputClass} value={value.parcelas} onChange={(e) => set('parcelas', Number(e.target.value))}>{[1, 2, 3, 4].map((x) => <option key={x} value={x}>{x === 1 ? 'à vista' : `${x} (anuais)`}</option>)}</select></Field>
+      </div>
+      <Field label="Horário prometido"><select className={inputClass} value={value.faixa} onChange={(e) => set('faixa', e.target.value as TenderOffer['faixa'])}><option value="nobre">Jogos principais no horário nobre</option><option value="tarde">Jogos principais à tarde</option><option value="qualquer">A combinar</option></select></Field>
+      <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={value.streaming} onChange={(e) => set('streaming', e.target.checked)} /> Também no streaming próprio (permite sublicenciar depois)</label>
+    </div>
+  );
+}
+
+function Concorrencias({ gameId, state }: ScreenProps) {
+  const { run, busy } = useAction(gameId);
+  const toast = useUI((s) => s.toast);
+  const era = state.meta.era;
+  const ps = state.stations.find((s) => s.isPlayer)!;
+  const [bidFor, setBidFor] = useState<string | null>(null);
+  const [offer, setOffer] = useState<TenderOffer | null>(null);
+  const tenders = [...(state.tenders ?? [])].sort((a, b) => (a.status === 'encerrada' ? 1 : 0) - (b.status === 'encerrada' ? 1 : 0) || a.closes.localeCompare(b.closes));
+  const name = (id: string | null) => (id ? state.stations.find((s) => s.id === id)?.name ?? id : '—');
+
+  const meet = async (t: TenderPublic) => {
+    const r = await run<{ negotiationId: string }>('negotiation-open', { tenderId: t.id });
+    if (r) go(`g/${gameId}/direitos?neg=${r.negotiationId}`);
+  };
+  const submit = async (t: TenderPublic) => {
+    if (!offer) return;
+    if (!window.confirm(`Entregar o envelope: ${offerLine(era, offer)}? Não dá para mudar depois.`)) return;
+    const intent: Intent = { type: 'tender_bid', tenderId: t.id, offer };
+    const local: GameState = structuredClone(state);
+    const r = applyIntent(local, intent);
+    if (!r.ok) { toast('error', r.message); return; }
+    setGameState(gameId, local);
+    const res = await run<{ result: { ok: boolean; message: string } }>('apply-intent', { intent });
+    if (!res || !res.result.ok) {
+      if (res) toast('error', res.result.message);
+      await queryClient.invalidateQueries({ queryKey: ['game', gameId] });
+    } else {
+      toast('success', r.message);
+      setBidFor(null);
+    }
+  };
+  const resolve = async (t: TenderPublic) => {
+    const r = await run<{ results: unknown[] }>('tender-resolve', { tenderId: t.id }, { invalidate: ['inbox', 'rights'] });
+    if (r) toast(r.results.length ? 'success' : 'info', r.results.length ? 'Envelopes abertos. O resultado está na caixa de entrada.' : 'Ainda não há envelopes para abrir.');
+  };
+
+  if (!tenders.length) return <Empty title="Nenhuma concorrência aberta">As concorrências de direitos esportivos aparecem aqui (e na caixa de entrada) quando abrem.</Empty>;
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-muted">Envelope fechado: quem vende pontua o valor, a exposição na TV aberta (jogos, horário e alcance da emissora) e o relacionamento. A reunião (custa {NEG_AGENDA_COST} pontos de agenda) serve para apresentar o projeto de transmissão; os lances dos rivais nunca são revelados antes da abertura.</p>
+      {tenders.map((t) => {
+        const mine = t.playerBid;
+        const r = t.result;
+        const open = t.status === 'aberta' && state.meta.status === 'active';
+        return (
+          <div key={t.id} className="card space-y-2 p-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="min-w-0 flex-1">
+                <div className="font-semibold">{t.compName}{t.pacote ? ` (pacote ${t.pacote.toUpperCase()})` : ''} · {t.cycle}</div>
+                <div className="text-xs text-muted">{t.kind === 'renovacao' ? 'Renovação' : 'Concorrência'} da {t.sellerName} · contrato de {formatDate(t.startDate)} a {formatDate(t.endDate)}</div>
+              </div>
+              <Badge tone={TENDER_STATUS[t.status]?.tone ?? 'neutral'}>{TENDER_STATUS[t.status]?.label ?? t.status}</Badge>
+            </div>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+              <span className="text-muted">Prazo dos envelopes</span><span className="text-right">{formatDate(t.closes)}</span>
+              <span className="text-muted">Dona atual</span><span className="text-right">{name(t.incumbent)}</span>
+              <span className="text-muted"><Tip text="Valor justo estimado pela Pesquisa para o ciclo inteiro, com a imprecisão dela. O mercado pode pagar bem mais.">Referência da Pesquisa</Tip></span><span className="tabular text-right">{moneyEra(era, t.reference)}</span>
+              {t.interested.length > 0 && (<><span className="text-muted">O mercado comenta</span><span className="text-right">{t.interested.join(', ')} devem disputar</span></>)}
+              {t.planBonus > 0 && (<><span className="text-muted">Projeto apresentado</span><span className="text-right text-good">conta pontos na exposição</span></>)}
+            </div>
+            {mine && <div className="rounded-theme bg-surface-2 px-3 py-2 text-xs">Seu envelope ({formatDate(mine.submittedOn)}): {offerLine(era, mine)}</div>}
+            {r && (
+              <div className={`rounded-theme px-3 py-2 text-sm ${r.winner === ps.id ? 'border border-good/50 bg-good/10' : 'bg-surface-2'}`}>
+                {r.winner ? <>Venceu a <b>{r.winnerName}</b>, com {moneyEra(era, r.winningValue)}.</> : r.note}
+                {mine && <div className="mt-1 text-xs text-muted">{r.winner === ps.id ? 'O contrato já está em Contratos.' : r.playerValid === false ? 'Seu envelope ficou abaixo do mínimo.' : `Seu envelope ficou em ${r.ranking.findIndex((x) => x.stationId === ps.id) + 1}º de ${r.ranking.length}.`}</div>}
+              </div>
+            )}
+            <div className="flex flex-wrap gap-2">
+              {open && !mine && <Button size="sm" variant="primary" busy={busy} onClick={() => void meet(t)}>Reunião com a {t.sellerName}</Button>}
+              {open && !mine && <Button size="sm" busy={busy} onClick={() => { setBidFor(bidFor === t.id ? null : t.id); setOffer({ valor: t.reference, jogos: 1, faixa: 'nobre', streaming: false, parcelas: 4 }); }}>{bidFor === t.id ? 'Fechar o envelope' : 'Entregar envelope sem reunião'}</Button>}
+              {t.status === 'a_resolver' && <Button size="sm" variant="primary" busy={busy} onClick={() => void resolve(t)}>Abrir os envelopes</Button>}
+            </div>
+            {bidFor === t.id && offer && open && (
+              <div className="space-y-2 rounded-theme border border-border p-3">
+                <BidForm era={era} value={offer} onChange={setOffer} />
+                <Button full variant="primary" busy={busy} onClick={() => void submit(t)}>Entregar o envelope</Button>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function TenderMesa({ gameId, state, negotiationId, pub, rounds, loading }: ScreenProps & { negotiationId: string; pub: TenderMeetingPub; rounds: RoundRow[]; loading: boolean }) {
+  const { run, busy } = useAction(gameId);
+  const toast = useUI((s) => s.toast);
+  const era = state.meta.era;
+  const t = state.tenders?.find((x) => x.id === pub.tenderId);
+  const [text, setText] = useState('');
+  const [offer, setOffer] = useState<TenderOffer>(() => (t?.playerBid ? { ...t.playerBid } : { valor: t?.reference ?? 0, jogos: 1, faixa: 'nobre', streaming: false, parcelas: 4 }));
+  const [tags, setTags] = useState<string[]>([]);
+  const endRef = useRef<HTMLDivElement>(null);
+  const llm = backendSync().mode === 'cloud';
+  useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }); }, [rounds.length]);
+  const open = pub.status === 'aberta' && state.meta.status === 'active' && t?.status === 'aberta';
+  const turn = async (body: Record<string, unknown>) => {
+    const r = await run<{ notes?: string[]; message?: string }>('negotiation-turn', { negotiationId, ...body });
+    if (r) {
+      setText('');
+      setTags([]);
+      for (const note of r.notes ?? []) toast('info', note);
+      if (r.message) toast('success', r.message);
+      invalidateGameData(gameId, ['negotiations', 'negrounds']);
+    }
+  };
+  const patienceTone = pub.patiencePct > 66 ? 'good' : pub.patiencePct > 33 ? 'warn' : 'bad';
+  return (
+    <div className="mx-auto max-w-6xl space-y-3 p-3 sm:p-4 lg:p-6">
+      <div className="space-y-1">
+        <div className="flex items-center justify-between gap-2">
+          <Button size="sm" variant="ghost" onClick={() => go(`g/${gameId}/direitos?tab=concorrencias`)}>← Concorrências</Button>
+          <Badge tone={STATUS[pub.status]?.tone ?? 'neutral'}>{pub.status === 'fechada' ? 'reunião encerrada' : STATUS[pub.status]?.label ?? pub.status}</Badge>
+        </div>
+        <h1 className="text-lg font-black leading-tight sm:text-xl">Concorrência: {pub.label}</h1>
+        <p className="text-xs text-muted">{pub.holderName}{pub.representative ? ` · ${pub.representative.nome}, ${pub.representative.cargo}` : ''}</p>
+      </div>
+      <div className="grid gap-3 lg:grid-cols-[1fr_360px]">
+        <div className="card flex max-h-[calc(100dvh-220px)] min-h-[320px] flex-col">
+          <div className="scrollbar-thin flex-1 space-y-3 overflow-y-auto p-4">
+            {loading && <Spinner />}
+            {rounds.map((r) => (
+              <div key={r.id} className="space-y-2">
+                {(r.player_text || r.player_offer) && (
+                  <div className="ml-auto max-w-[85%] rounded-2xl rounded-tr-sm bg-accent/20 px-3 py-2 text-sm">
+                    {r.player_text && <p>{r.player_text}</p>}
+                    {r.player_offer && <p className="mt-1 text-xs text-muted">Projeto: {offerLine(era, r.player_offer as unknown as TenderOffer)}</p>}
+                    {r.argument_tags?.length > 0 && <p className="mt-1 text-[11px] text-muted">Argumentos: {r.argument_tags.map((x) => ARGUMENT_TAGS[x] ?? x).join('; ')}</p>}
+                  </div>
+                )}
+                {(r.holder_text ?? []).map((l, i) => l.speaker === 'narrador' ? (
+                  <p key={i} className="fade-in text-sm italic text-muted">{l.text}</p>
+                ) : (
+                  <div key={i} className="fade-in flex gap-3">
+                    <span className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-3 text-base">💼</span>
+                    <div className="min-w-0 flex-1 rounded-2xl rounded-tl-sm bg-surface-2 px-3 py-2">
+                      <div className="text-xs font-bold text-accent">{pub.representative?.nome ?? 'Representante'}<span className="ml-1 font-normal text-muted">· {pub.holderName}</span></div>
+                      <p className="mt-0.5 whitespace-pre-line text-sm">{l.text}</p>
+                    </div>
+                  </div>
+                ))}
+                {r.engine_decision?.type && r.round > 0 && <div className="flex justify-center"><Badge tone={DECISION[r.engine_decision.type]?.tone ?? 'neutral'}>Rodada {r.round}: {DECISION[r.engine_decision.type]?.label ?? r.engine_decision.type}</Badge></div>}
+              </div>
+            ))}
+            {t?.playerBid && <div className="rounded-theme border border-good/50 bg-good/10 p-3 text-sm">Envelope entregue: {offerLine(era, t.playerBid)}. A abertura é depois de {formatDate(t.closes)}.</div>}
+            <div ref={endRef} />
+          </div>
+          {open && (
+            <form className="safe-bottom flex gap-2 border-t border-border p-3 pr-16 lg:pr-3" onSubmit={(e) => { e.preventDefault(); if (text.trim()) void turn({ text: text.trim(), offer, tags }); }}>
+              <input className={inputClass} value={text} maxLength={600} onChange={(e) => setText(e.target.value)} placeholder={llm ? 'Ex.: "Passamos 2 jogos por rodada no nobre e no streaming"' : 'Modo demonstração: use o formulário'} disabled={!llm} />
+              <Button type="submit" variant="primary" busy={busy} disabled={!text.trim()}>Falar</Button>
+            </form>
+          )}
+        </div>
+        <div className="space-y-3">
+          <Card title="Reunião">
+            <div className="flex items-center gap-2"><Bar value={pub.patiencePct} tone={patienceTone} /><span className="tabular w-10 text-right text-sm">{pub.patiencePct}%</span></div>
+            <p className="mt-2 text-xs text-muted">Rodada {pub.round} de {pub.maxRounds}. Prazo dos envelopes: {t ? formatDate(t.closes) : '—'}. Referência da Pesquisa: {t ? moneyEra(era, t.reference) : '—'}.</p>
+            {pub.feedback.length > 0 && <ul className="mt-2 list-disc space-y-0.5 pl-4 text-xs">{pub.feedback.map((f) => <li key={f}>{TENDER_REASONS[f] ?? f}</li>)}</ul>}
+          </Card>
+          {open && (
+            <Card title="Seu projeto e o envelope">
+              <BidForm era={era} value={offer} onChange={setOffer} />
+              <div className="mt-2">
+                <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted">Projeto de transmissão</div>
+                <div className="flex flex-wrap gap-1">
+                  {[...PROJECT_TAGS, 'oferta_rival'].map((k) => (
+                    <button key={k} type="button" onClick={() => setTags((x) => (x.includes(k) ? x.filter((y) => y !== k) : [...x, k]))} className={`rounded-full border px-2 py-0.5 text-[11px] ${tags.includes(k) ? 'border-accent bg-accent/15 text-accent' : 'border-border text-muted'}`}>{ARGUMENT_TAGS[k] ?? k}</button>
+                  ))}
+                </div>
+                <p className="mt-1 text-[11px] text-muted">Cada argumento novo do projeto melhora um pouco a sua exposição (no máximo +0,1 na pontuação).</p>
+              </div>
+              <div className="mt-3 grid gap-2">
+                <Button full busy={busy} onClick={() => void turn({ offer, tags, text: text.trim() || undefined })}>Apresentar o projeto</Button>
+                <Button full variant="primary" busy={busy} onClick={() => { if (window.confirm(`Entregar o envelope: ${offerLine(era, offer)}? Não dá para mudar depois.`)) void turn({ action: 'envelope', offer, tags }); }}>Entregar o envelope</Button>
+              </div>
+            </Card>
+          )}
+          {open && <Button full variant="danger" busy={busy} onClick={() => void turn({ action: 'levantar' })}>Levantar da mesa</Button>}
+        </div>
+      </div>
     </div>
   );
 }

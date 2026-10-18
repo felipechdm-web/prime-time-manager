@@ -6,6 +6,7 @@ import { initialContracts } from './negotiation.ts';
 import { createWorld, SCENARIOS } from './setup.ts';
 import { initSports } from './sports.ts';
 import { createSportsContracts } from './sportsTv.ts';
+import { refreshTenders } from './tenders.ts';
 import type { NewGameInput } from './setup.ts';
 import { firstWeekSetup, runWarmup } from './sim.ts';
 import type { SimOutputs } from './sim.ts';
@@ -20,6 +21,7 @@ export function newGame(input: NewGameInput): { state: GameState; outputs: SimOu
   if (state.catalog?.sports) {
     initSports(state); // esporte real (seção 8C): calendário e jogos anteriores à largada
     createSportsContracts(state); // direitos esportivos da largada (mapa da seção 8C.2) viram contratos
+    refreshTenders(state); // concorrências já abertas na largada (Copa do Brasil 2027–2030)
   }
   lockSignatures(state);
   runWarmup(state);

@@ -596,6 +596,7 @@ export interface SportContractInfo {
   aired: number; // jogos que foram ao ar
   checkedSeasons: string[]; // temporadas com obrigação já conferida
   cotaSeasons: string[]; // temporadas com cotas de patrocínio já vendidas
+  rightsPaid?: boolean; // direitos pagos em parcelas do contrato (concorrência): o jogo custa só a produção
   crew?: 'local' | 'estudio'; // equipe no estádio (padrão) ou narração do estúdio (mais barata, menos qualidade)
   crewRequired?: boolean; // contrato exige equipe própria no local (seção 8B.2)
 }
@@ -778,6 +779,48 @@ export interface GameState {
   rightsContracts?: RightsContract[]; // v2: contratos de direitos (largada e negociados); espelhados em rights_contracts
   holderRel?: Record<string, Record<string, HolderRelation>>; // v2: relacionamento player -> emissora (0 a 100)
   sports?: SportsState; // v2 (Fase 6.4): resultados, mudanças de calendário e transmissões do esporte real
+  tenders?: TenderPublic[]; // v2 (Fase 6.4): concorrências de direitos esportivos (só a parte pública)
+}
+
+// ===== concorrência de direitos esportivos (seções 8B.3, item 6, e 19.7) =====
+// envelope: valor total do ciclo e o projeto de transmissão (o que pesa além do dinheiro)
+export interface TenderOffer {
+  valor: number;
+  jogos: number; // jogos por rodada na TV aberta (1 ou 2)
+  faixa: 'nobre' | 'tarde' | 'qualquer'; // horário prometido para os jogos principais
+  streaming: boolean; // também no streaming próprio
+  parcelas: number; // 1 a 4 (uma por ano do ciclo)
+}
+export interface TenderResult {
+  winner: string | null; // emissora vencedora
+  winnerName: string;
+  winningValue: number;
+  ranking: { stationId: string; name: string; score: number; valid: boolean }[];
+  playerValid: boolean | null; // o envelope do jogador passou do mínimo? (null: não entregou)
+  note: string;
+}
+export interface TenderPublic {
+  id: string;
+  comp: string;
+  compName: string;
+  pacote: string | null; // pacote do direito (ex.: lfu) ou null
+  cycle: string; // ex.: 2027-2030
+  seller: string; // player que vende (cbf, wbd...)
+  sellerName: string;
+  kind: 'concorrencia' | 'renovacao';
+  opens: string;
+  closes: string; // prazo para entregar o envelope
+  startDate: string; // início do contrato
+  endDate: string;
+  seasons: number;
+  incumbent: string | null; // emissora com o contrato que está acabando
+  interested: string[]; // emissoras que o mercado comenta que vão disputar (boato, não lance)
+  reference: number; // valor de referência aproximado (com a imprecisão da Pesquisa)
+  status: 'aberta' | 'a_resolver' | 'encerrada';
+  playerBid: (TenderOffer & { submittedOn: string; exposure: number }) | null;
+  planBonus: number; // projeto de transmissão apresentado na reunião (0 a 0,1)
+  met: boolean; // o jogador já se reuniu com quem vende
+  result?: TenderResult;
 }
 
 export interface InboxDraft {

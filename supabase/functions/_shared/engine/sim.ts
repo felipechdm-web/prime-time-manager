@@ -12,6 +12,7 @@ import { computeLiveMoments } from './live.ts';
 import { devProgress, refreshOffers, resolveAuctions } from './market.ts';
 import { processContracts } from './negotiation.ts';
 import { advanceSports, planCalendarChanges } from './sports.ts';
+import { refreshTenders } from './tenders.ts';
 import { assignBroadcasts, closeSportsWeek, decisiveBroadcast, HABIT_LOSS_PER_DISPLACEMENT, sellSportsCotas, sportsEventCandidates, weekDisplacements } from './sportsTv.ts';
 import { money } from './money.ts';
 import { boletimFallback, dayFallback, evaluationFallback } from './narrative.ts';
@@ -796,6 +797,8 @@ export function startWeek(state: GameState, out: SimOutputs, opts: { quiet?: boo
   if (state.sports) {
     const changes = planCalendarChanges(state, state.meta.date);
     assignBroadcasts(state);
+    // concorrências e renovações de direitos esportivos (envelopes fechados)
+    for (const n of refreshTenders(state)) inbox(state, { fromNpc: 'npc_comercial', subject: 'Concorrência de direitos esportivos', body: `${n} Veja em Mercado de Direitos → Concorrências.`, requiresAction: false, eventId: null, kind: 'mensagem' });
     for (const n of sellSportsCotas(state)) inbox(state, { fromNpc: 'npc_comercial', subject: 'Cotas do esporte', body: n, requiresAction: false, eventId: null, kind: 'mensagem' });
     if (!opts.quiet) {
       const decisive = decisiveBroadcast(state);

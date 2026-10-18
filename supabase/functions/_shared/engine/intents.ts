@@ -10,6 +10,8 @@ import { blocksFromSlots, cloneWeek, placeBlock, slotArray } from './schedule.ts
 import { makeContract } from './setup.ts';
 import { setSportsCrew, setSportsPick, sublicenseSport } from './sportsTv.ts';
 import { computeLiveMoments } from './live.ts';
+import { submitTenderBid } from './tenders.ts';
+import type { TenderOffer } from './types.ts';
 import { getProgram, nextId, npcById, npcByRole, playerStation, pushTimeline } from './state.ts';
 import type { Block, GameState, Program } from './types.ts';
 import { validateSchedule } from './validate.ts';
@@ -40,7 +42,8 @@ export type Intent =
   | { type: 'ack_alert'; key: string }
   | { type: 'sublicense_sport'; contractId: string }
   | { type: 'sports_pick'; contractId: string; unit: string; code: string | null }
-  | { type: 'sports_crew'; contractId: string; crew: 'local' | 'estudio' };
+  | { type: 'sports_crew'; contractId: string; crew: 'local' | 'estudio' }
+  | { type: 'tender_bid'; tenderId: string; offer: Partial<TenderOffer> };
 
 export interface IntentResult {
   ok: boolean;
@@ -393,6 +396,11 @@ export function applyIntent(state: GameState, intent: Intent): IntentResult {
       // Central de Esportes: trocar o jogo da rodada ou abrir mão da transmissão
       const r = setSportsPick(state, String(intent.contractId ?? ''), String(intent.unit ?? ''), intent.code ? String(intent.code) : null);
       if (r.ok) state.liveMoments = computeLiveMoments(state);
+      return r.ok ? { ok: true, message: r.message } : fail(r.message);
+    }
+    case 'tender_bid': {
+      // envelope fechado da concorrência esportiva (sem reunião; a reunião na Mesa acrescenta o projeto)
+      const r = submitTenderBid(state, String(intent.tenderId ?? ''), (intent.offer ?? {}) as Partial<TenderOffer>);
       return r.ok ? { ok: true, message: r.message } : fail(r.message);
     }
     case 'sports_crew': {

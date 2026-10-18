@@ -15,7 +15,7 @@ pelos anos seguintes. Joga-se no navegador, no PC e no celular.
 |---|---|---|
 | Motor | `supabase/functions/_shared/engine/` | TypeScript puro e determinístico (semente por partida). Audiência por faixa de 15 min em 15 praças (PNT), 7 segmentos de público, herança, hábito, buzz, fadiga, fuga para o digital; comercial (CPP, ocupação, descontos, cotas, merchandising, arrendamento); rivais com arquétipos; baralho de 87 eventos com arcos (10 deles do esporte real); KPIs, fechamentos e carreira. |
 | Mestre | `supabase/functions/_shared/game/` | Chama a Claude API (saída estruturada em JSON, validada com Zod e com uma tentativa de correção). Remove frases com números inventados, limita efeitos propostos (humor ±15, confiança ±10, buzz ±10, reputação ±3) e trata o texto livre do jogador como dado. Sem chave ou sem crédito, usa textos padrão e o jogo continua. |
-| Funções | `supabase/functions/<nome>/` | 13 Edge Functions (Deno): `create-game`, `apply-intent`, `simulate-week`, `mestre-scene`, `resolve-event`, `live-mode`, `interpret-free-action`, `catalog-admin` (Editor de Catálogo) e as da Mesa de Negociação: `catalog-browse`, `negotiation-open`, `negotiation-turn`, `negotiation-close` e `tender-resolve` (só estrutura até a Fase 6.4). Conferem o login, carregam o estado, rodam o motor, gravam com trava de versão e devolvem só o que mudou. |
+| Funções | `supabase/functions/<nome>/` | 13 Edge Functions (Deno): `create-game`, `apply-intent`, `simulate-week`, `mestre-scene`, `resolve-event`, `live-mode`, `interpret-free-action`, `catalog-admin` (Editor de Catálogo) e as da Mesa de Negociação: `catalog-browse`, `negotiation-open`, `negotiation-turn`, `negotiation-close` e `tender-resolve` (abre os envelopes das concorrências esportivas). Conferem o login, carregam o estado, rodam o motor, gravam com trava de versão e devolvem só o que mudou. |
 | Banco | `supabase/setup_completo.sql` | Postgres com RLS: cada jogador só lê as próprias partidas; o site só **lê** as tabelas do jogo e toda escrita passa pelas funções. |
 | Site | `apps/web/` | React 19 + Vite + Tailwind. Navegação lateral no PC e inferior no celular; grade com arrastar e soltar (PC) e toque no horário (celular); Editor de Catálogo para os títulos reais. Instalável na tela inicial (PWA). |
 
@@ -109,6 +109,12 @@ prime-time-manager/
   (sem IA, texto-modelo). Eventos da seção 8C.7 no baralho (seleção eliminada, final, rebaixamento, jogo adiado,
   mudança de horário, narrador assediado, exclusividade de patrocinador, briga em campo, concorrência). Os jogos são
   espelhados na tabela `fixtures`.
+  Concorrências (`engine/tenders.ts`): a Copa do Brasil 2027–2030 abre na largada (como no catálogo) e cada direito
+  esportivo abre a renovação seis meses antes de vencer. O jogador entrega um envelope (valor, jogos por rodada na TV
+  aberta, horário, streaming e parcelas) e pode marcar uma reunião na Mesa de Negociação para apresentar o projeto de
+  transmissão (o representante dá retorno sem revelar números). No prazo, `tender-resolve` abre os envelopes: quem
+  vende pontua preço, exposição e relacionamento; o mínimo e os lances dos rivais ficam só no servidor. O vencedor
+  ganha o contrato (parcelas anuais) e passa a transmitir no ciclo novo; o resultado diferente do real vira divergência.
 - **Modelos (v2, seção 17.5)**: todas as funções usam `claude-haiku-5-5` com esforço baixo e raciocínio desligado;
   cada função tem o seu `max_tokens` (`supabase/functions/_shared/game/llmConfig.ts`). O Sonnet 5.5 fica como
   modo premium desligado (`LLM_PREMIUM=on` liga, só na avaliação com a presidência). Tudo pode ser trocado por

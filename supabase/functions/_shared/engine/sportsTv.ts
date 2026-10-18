@@ -373,10 +373,12 @@ function ensureWindowPrograms(state: GameState, w: SportsWindow): void {
   const regional = new Set(w.byMarket).size > 1;
   const title = regional ? `${comp?.name ?? 'Futebol'}: jogo da sua praça` : matchTitle(state, f);
   // equipe: narração do estúdio custa 35% menos e perde qualidade; sem o narrador da casa (evento), também perde
-  const crew = state.rightsContracts?.find((c) => c.id === w.contract)?.sport?.crew ?? 'local';
+  const sportInfo = state.rightsContracts?.find((c) => c.id === w.contract)?.sport;
+  const crew = sportInfo?.crew ?? 'local';
   const narratorGone = typeof state.flags.narrador_saiu === 'number' && state.meta.weekIndex - Number(state.flags.narrador_saiu) < 26;
   const quality = 80 - (crew === 'estudio' ? 12 : 0) - (narratorGone ? 6 : 0);
-  const cost = Math.round((comp ? matchCost(comp) : 1_000_000) * (crew === 'estudio' ? 0.65 : 1));
+  // direito comprado em concorrência: as parcelas pagam os direitos; o jogo custa só a produção (25%)
+  const cost = Math.round((comp ? matchCost(comp) : 1_000_000) * (sportInfo?.rightsPaid ? 0.25 : 1) * (crew === 'estudio' ? 0.65 : 1));
   const nat = MARKETS.reduce((s, _, i) => s + (w.byMarket[i] ? matchInterest(state, fixtureByCode(state, w.byMarket[i]) ?? f, i) : 0.6) * MARKET_WEIGHTS[i], 0);
   const make = (id: string, genre: 'futebol' | 'mesa_redonda', ttl: string, role: string | null, slots: number, costPerEp: number) => {
     let p = getProgram(state, id);

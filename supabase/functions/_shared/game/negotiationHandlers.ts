@@ -21,7 +21,11 @@ import type { BandId, CatalogTitleSnap, GameState, TermSheet } from '../engine/t
 import { addDays } from '../engine/time.ts';
 import { diffPatch, flushInbox, loadGame, saveGame, snapshot } from './handlers.ts';
 import { allowedNumbers, budgetOk, callLLM, contextBlock, scrubNumbers } from './mestre.ts';
-import { decisionLines, LEAVE_LINES, openingLines, PAUSE_LINES, termsText } from './negotiationTexts.ts';
+import { decisionLines, LEAVE_LINES, openingLines, PAUSE_LINES, TENDER_ENVELOPE_LINES, tenderFeedbackLines, tenderOpeningLines, termsText } from './negotiationTexts.ts';
+import { evaluatePitch, normalizeOffer, openTenderMeeting, submitTenderBid, TENDER_REASONS } from '../engine/tenders.ts';
+import type { TenderHidden, TenderMeetingPub } from '../engine/tenders.ts';
+import type { TenderOffer, TenderPublic } from '../engine/types.ts';
+import { resolveDueTenders } from './tenderResolve.ts';
 import { MESTRE_V1_FIXED, NEG_INTERPRET_SCHEMA, NEG_VOICE_SCHEMA, negInterpretSystem } from './prompt.ts';
 import { syncRights } from './rightsSync.ts';
 import { HttpError } from './types.ts';
@@ -236,6 +240,7 @@ export async function negotiationOpenHandler(ctx: HandlerCtx, body: Record<strin
   const state = row.state;
   if (state.meta.status !== 'active') throw new HttpError(400, 'A partida está encerrada');
   requireCatalog(state);
+  if (typeof body.tenderId === 'string' && body.tenderId) return tenderMeetingOpen(ctx, row, body.tenderId); // concorrência esportiva
   const ps = playerStation(state);
   const t = titleById(state, String(body.titleId ?? ''));
   if (!t) throw new HttpError(404, 'Título não encontrado no catálogo desta partida');
@@ -311,6 +316,7 @@ export async function negotiationOpenHandler(ctx: HandlerCtx, body: Record<strin
 export async function negotiationTurnHandler(ctx: HandlerCtx, body: Record<string, unknown>) {
   const id = String(body.negotiationId ?? '');
   const { row, pub, hidden } = await loadNegotiation(ctx, id);
+  if ((pub as unknown as { kind: string }).kind === 'concorrencia') return tenderMeetingTurn(ctx, id, row, pub as unknown as TenderMeetingPub, hidden as unknown as TenderHidden, body);
   const state = row.state;
   const before = snapshot(state);
   if (pub.status !== 'aberta') throw new HttpError(400, 'Esta reunião não está aberta');
@@ -458,8 +464,117 @@ export async function negotiationCloseHandler(ctx: HandlerCtx, body: Record<stri
   };
 }
 
-// ===== tender-resolve: concorrências fechadas (estrutura pronta; produtos esportivos chegam na Fase 6.4) =====
+// ===== concorrências esportivas (Fase 6.4): reunião na Mesa, envelope e abertura (tender-resolve) =====
+async function persistTenderMeeting(ctx: HandlerCtx, id: string, pub: TenderMeetingPub, hidden: TenderHidden | null): Promise<void> {
+  const now = ctx.now().toISOString();
+  await ctx.store.update('negotiations', { id }, { public_state: pub, status: pub.status, round: pub.round, updated_at: now });
+  if (hidden) await ctx.store.update('negotiation_secrets', { negotiation_id: id }, { hidden_state: hidden, updated_at: now });
+}
+
+function tenderEnvelope(state: GameState, t: TenderPublic, pub: TenderMeetingPub, decision: string, reasons: string[], offer: TenderOffer | null, text: string | null) {
+  return {
+    player: pub.holderName,
+    produto: pub.label,
+    tipo: 'concorrencia_fechada',
+    prazo_dos_envelopes: t.closes.split('-').reverse().join('/'),
+    rodada: pub.round,
+    de: pub.maxRounds,
+    decisao_do_motor: decision,
+    motivos: reasons.map((r) => TENDER_REASONS[r] ?? r),
+    proposta_do_jogador: offer ? { valor_texto: money(state.meta.era, offer.valor), jogos_por_rodada_na_tv_aberta: offer.jogos, horario: offer.faixa, streaming: offer.streaming, parcelas: offer.parcelas } : null,
+    fala_do_jogador: text ? `<<<${text.slice(0, 600)}>>>` : null,
+    paciencia_do_representante: patienceText(pub.patiencePct),
+    regra: 'Envelope fechado: o representante nunca revela valores mínimos nem lances de outras emissoras.',
+  };
+}
+
+async function tenderMeetingOpen(ctx: HandlerCtx, row: GameRow, tenderId: string) {
+  const state = row.state;
+  const ps = playerStation(state);
+  const t = state.tenders?.find((x) => x.id === tenderId);
+  if (!t) throw new HttpError(404, 'Concorrência não encontrada');
+  const existing = (await ctx.store.select('negotiations', { game_id: row.id, product_ref: tenderId })).find((n) => n.status === 'aberta');
+  if (existing) return { negotiationId: String(existing.id), pub: existing.public_state, narrative: [], resumed: true, agendaPoints: state.agenda.points, patch: {}, version: row.version };
+  if (state.agenda.points < NEG_AGENDA_COST) throw new HttpError(400, `Faltam pontos de agenda (a reunião custa ${NEG_AGENDA_COST})`);
+  const before = snapshot(state);
+  const o = openTenderMeeting(state, tenderId);
+  if ('error' in o) throw new HttpError(400, o.error);
+  const { hidden, pub } = o;
+  state.agenda.points -= NEG_AGENDA_COST;
+  state.agenda.meetings += 1;
+  const id = ctx.uuid();
+  const v = await voice(ctx, state, row.id, pub as unknown as NegPublic, tenderEnvelope(state, t, pub, 'abertura_da_concorrencia', [], null, null), '', () => tenderOpeningLines(pub, t.closes));
+  await saveGame(ctx, row, state);
+  const now = ctx.now().toISOString();
+  await ctx.store.insert('negotiations', [{
+    id, game_id: row.id, station_id: ps.id, rights_holder_id: t.seller, product_ref: tenderId, kind: 'concorrencia', status: 'aberta',
+    round: 0, max_rounds: pub.maxRounds, public_state: pub, rival_interest: t.interested.map((x) => ({ emissora: x })), game_date: state.meta.date, deadline: t.closes,
+    created_at: now, updated_at: now,
+  }]);
+  await ctx.store.insert('negotiation_secrets', [{ negotiation_id: id, hidden_state: hidden, created_at: now, updated_at: now }]);
+  await ctx.store.insert('negotiation_rounds', [{ negotiation_id: id, round: 0, holder_text: v.narrative, engine_decision: { type: 'abertura' }, argument_tags: [], created_at: now }]);
+  return { negotiationId: id, pub, narrative: v.narrative, usedLLM: v.usedLLM, note: v.note, agendaPoints: state.agenda.points, patch: diffPatch(before, state), version: row.version };
+}
+
+async function tenderMeetingTurn(ctx: HandlerCtx, id: string, row: GameRow, pub: TenderMeetingPub, hidden: TenderHidden, body: Record<string, unknown>) {
+  const state = row.state;
+  const before = snapshot(state);
+  if (pub.status !== 'aberta') throw new HttpError(400, 'Esta reunião não está aberta');
+  const t = state.tenders?.find((x) => x.id === pub.tenderId);
+  if (!t) throw new HttpError(404, 'Concorrência não encontrada');
+  const text = typeof body.text === 'string' ? body.text.trim().slice(0, 800) : '';
+  const action = ['envelope', 'levantar', 'proposta'].includes(String(body.action)) ? String(body.action) : 'proposta';
+  const now = ctx.now().toISOString();
+  const notes: string[] = [];
+  const saveRound = async (offer: TenderOffer | null, decision: Row, narrative: MestreNarrative[], tags: string[]) => {
+    await ctx.store.insert('negotiation_rounds', [{ negotiation_id: id, round: pub.round, player_text: text || null, player_offer: offer, argument_tags: tags, engine_decision: decision, holder_text: narrative, created_at: now }]);
+  };
+  if (action === 'levantar') {
+    pub.status = 'fracassada';
+    await persistTenderMeeting(ctx, id, pub, null);
+    await saveRound(null, { type: 'levantou' }, LEAVE_LINES, []);
+    return { pub, decision: { type: 'fim', reasons: ['jogador_levantou'] }, narrative: LEAVE_LINES, notes, patch: {}, version: row.version };
+  }
+  let offer = normalizeOffer((body.offer && typeof body.offer === 'object' ? body.offer : t.playerBid ?? {}) as Partial<TenderOffer>);
+  let tags = Array.isArray(body.tags) ? (body.tags as unknown[]).map(String).filter((x) => x in ARGUMENT_TAGS) : [];
+  // a IA só lê a fala (valor e argumentos); quem avalia é o motor
+  if (text && action === 'proposta') {
+    const interp = await interpret(ctx, state, row.id, { ...(pub as unknown as NegPublic), onTable: null, playerLast: null }, text);
+    if (interp?.terms.valor) offer = { ...offer, valor: Math.max(0, Math.round(Number(interp.terms.valor))) };
+    if (interp?.tags.length) tags = [...new Set([...tags, ...interp.tags])];
+    if (!ctx.llm) notes.push('Sem a IA, vale o que está no formulário (o texto fica só no histórico).');
+  }
+  if (action === 'envelope') {
+    const r = submitTenderBid(state, t.id, offer);
+    if (!r.ok) throw new HttpError(400, r.message);
+    pub.status = 'fechada';
+    await saveGame(ctx, row, state);
+    await persistTenderMeeting(ctx, id, pub, null);
+    await saveRound(offer, { type: 'envelope' }, TENDER_ENVELOPE_LINES, tags);
+    return { pub, decision: { type: 'envelope', reasons: [] }, narrative: TENDER_ENVELOPE_LINES, message: r.message, notes, patch: diffPatch(before, state), version: row.version };
+  }
+  if (offer.valor <= 0) throw new HttpError(400, 'Apresente um valor para o envelope (formulário ou fala)');
+  const ev = evaluatePitch(state, t, hidden, pub, { offer, tags });
+  const decision = ev.ended ? 'fim_da_reuniao' : 'avaliacao_do_projeto';
+  const v = await voice(ctx, state, row.id, ev.pub as unknown as NegPublic, tenderEnvelope(state, t, ev.pub, decision, ev.reasons, offer, text || null), await roundHistory(ctx, id), () => tenderFeedbackLines(ev.reasons));
+  await saveGame(ctx, row, state);
+  await persistTenderMeeting(ctx, id, ev.pub, ev.hidden);
+  await saveRound(offer, { type: ev.ended ? 'fim' : 'avaliacao', reasons: ev.reasons }, v.narrative, tags);
+  if (v.note) notes.push(v.note);
+  return { pub: ev.pub, decision: { type: ev.ended ? 'fim' : 'avaliacao', reasons: ev.reasons }, narrative: v.narrative, usedLLM: v.usedLLM, interpreted: { offer, tags }, notes, patch: diffPatch(before, state), version: row.version };
+}
+
+// tender-resolve: abre os envelopes das concorrências com prazo vencido (também roda sozinho na simulação semanal)
 export async function tenderResolveHandler(ctx: HandlerCtx, body: Record<string, unknown>) {
-  await loadGame(ctx, String(body.gameId));
-  return { available: false, message: 'As concorrências fechadas (direitos esportivos) chegam na Fase 6.4. O motor já sabe resolver lances fechados, mas ainda não há produtos em disputa.' };
+  const row = await loadGame(ctx, String(body.gameId));
+  const state = row.state;
+  if (!state.sports) return { available: false, message: 'Esta partida não tem esporte real (concorrências esportivas só no Brasil real com competições aprovadas).' };
+  const before = snapshot(state);
+  const results = await resolveDueTenders(ctx, row.id, state, typeof body.tenderId === 'string' ? body.tenderId : undefined);
+  if (results.length) {
+    await saveGame(ctx, row, state);
+    await flushInbox(ctx, row.id, state);
+    await syncRights(ctx, row.id, state);
+  }
+  return { available: true, results, tenders: state.tenders ?? [], patch: diffPatch(before, state), version: row.version };
 }

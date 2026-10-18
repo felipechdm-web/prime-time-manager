@@ -58,5 +58,33 @@ export function decisionLines(era: EraId, pub: NegPublic, d: NegDecision): Mestr
   return out;
 }
 
+// concorrência esportiva: o representante comenta o projeto sem revelar números nem lances dos rivais
+export function tenderOpeningLines(pub: { holderName: string; representative: { nome: string; cargo: string } | null; label: string }, closes: string): MestreNarrative[] {
+  const who = pub.representative ? `${pub.representative.nome}, ${pub.representative.cargo} da ${pub.holderName}` : `o representante da ${pub.holderName}`;
+  return [
+    nar(`Sala de reuniões. Você recebe ${who} para falar da concorrência de ${pub.label}.`),
+    rep(`A concorrência é por envelope fechado e o prazo vai até ${closes.split('-').reverse().join('/')}. Dinheiro pesa, mas a gente também olha exposição na TV aberta, horário e o projeto de transmissão. Me conte o que vocês têm em mente.`),
+  ];
+}
+
+const TENDER_LINES: Record<string, string> = {
+  valor_abaixo_do_minimo: 'Vou ser direto: com esse valor, a sua proposta nem entra na disputa.',
+  mercado_paga_mais: 'O valor é sério, mas não é o mais alto que estamos vendo.',
+  valor_competitivo: 'Com esse valor, vocês estão na briga.',
+  projeto_forte: 'O projeto de transmissão é forte: jogos na TV aberta, bom horário e alcance nacional. Isso conta muito.',
+  exposicao_fraca: 'Sinto falta de exposição: poucos jogos, horário fraco ou pouco alcance. A organizadora valoriza isso.',
+  projeto_valorizado: 'Gostei do que você apresentou do projeto. Vou levar isso para a diretoria.',
+  relacao_boa: 'E o histórico de vocês com a gente ajuda.',
+  relacao_fraca: 'Mas não vou fingir: o histórico entre nós não ajuda.',
+  concorrencia_e_fechada: 'Em concorrência fechada, não adianta me falar de outras propostas: cada um entrega o seu envelope.',
+  paciencia_esgotada: 'Acho que já ouvi o suficiente. Agora é com o envelope.',
+};
+export function tenderFeedbackLines(reasons: string[]): MestreNarrative[] {
+  const out = reasons.map((r) => TENDER_LINES[r]).filter(Boolean).map(rep);
+  if (reasons.includes('paciencia_esgotada')) out.push(nar('O representante guarda a pasta. A reunião terminou.'));
+  return out.slice(0, 4);
+}
+export const TENDER_ENVELOPE_LINES: MestreNarrative[] = [rep('Envelope recebido e lacrado. Ninguém abre antes do prazo.'), nar('Você deixa a sala com o protocolo na mão.')];
+
 export const PAUSE_LINES: MestreNarrative[] = [rep('Tudo bem, pense com calma. Mas o mercado não espera muito.')];
 export const LEAVE_LINES: MestreNarrative[] = [rep('Uma pena. A porta continua aberta.'), nar('Você deixa a sala sem acordo.')];

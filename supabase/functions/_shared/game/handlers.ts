@@ -11,6 +11,7 @@ import { money } from '../engine/money.ts';
 import { boletimFallback, liveFallback, sportsLiveFallback } from '../engine/narrative.ts';
 import { advanceSports } from '../engine/sports.ts';
 import { syncFixtures } from './fixturesSync.ts';
+import { resolveDueTenders } from './tenderResolve.ts';
 import { newGame } from '../engine/newGame.ts';
 import { SCENARIOS } from '../engine/setup.ts';
 import type { NewGameInput } from '../engine/setup.ts';
@@ -309,6 +310,8 @@ export async function simulateHandler(ctx: HandlerCtx, body: Record<string, unkn
   if (state.meta.status !== 'active') {
     // fim de jogo: carreira encerrada
   }
+  // concorrências esportivas com prazo vencido: abertura dos envelopes (tender-resolve) e anúncio do resultado
+  if (state.tenders?.some((t) => t.status === 'a_resolver')) await resolveDueTenders(ctx, row.id, state);
   await saveGame(ctx, row, state);
   if (state.rightsContracts?.length) await syncRights(ctx, row.id, state); // parcelas, multas e vencimentos da semana
   await syncFixtures(ctx, row.id, state); // esporte real: placares, horários e transmissões

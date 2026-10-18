@@ -19,7 +19,8 @@ export type LLMFunction =
   | 'interpret-free-action'
   | 'campaign-summary'
   | 'negociacao'
-  | 'negociacao-interpretar';
+  | 'negociacao-interpretar'
+  | 'tender-resolve';
 
 export interface FnDefault {
   label: string;
@@ -41,6 +42,7 @@ export const LLM_FUNCTIONS: Record<LLMFunction, FnDefault> = {
   'campaign-summary': { label: 'Resumo mensal da campanha', maxTokens: 400 },
   negociacao: { label: 'Negociação (fala do representante, por rodada)', maxTokens: 700 },
   'negociacao-interpretar': { label: 'Negociação (ler a proposta do jogador)', maxTokens: 300 },
+  'tender-resolve': { label: 'Concorrência esportiva (anúncio do resultado)', maxTokens: 400 },
 };
 
 export interface FnConfig {
