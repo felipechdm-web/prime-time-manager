@@ -13,6 +13,8 @@ import type { PreviewResult } from '@engine/preview.ts';
 import { ratingAllowed } from '@engine/setup.ts';
 import { BAND_BY_ID, bandOfSlot, DAY_NAMES, DAY_SHORT, slotLabel } from '@engine/time.ts';
 import { validateSchedule } from '@engine/validate.ts';
+import { slotArray } from '@engine/schedule.ts';
+import { sportsOverlayBlocks } from '@engine/sportsTv.ts';
 import type { Block, GameState, Program } from '@engine/types.ts';
 import { queryClient, setGameState, useAction } from '../lib/queries.ts';
 import { useRoute } from '../lib/router.ts';
@@ -68,6 +70,9 @@ export function Grade({ gameId, state }: ScreenProps) {
     if (day < doneDays && doneDays < 7) setDay(doneDays);
   }, [doneDays]);
 
+  // esporte real: jogos ao vivo da semana por cima da grade (a programação do horário vai para depois do jogo)
+  const sportsByDay = useMemo(() => week.map((d, i) => sportsOverlayBlocks(state, ps.id, i, slotArray(d))), [state, week]);
+  const sportsWeek = sportsByDay.flatMap((s, day) => s.blocks.filter((b) => b.role === 'jogo').map((b) => ({ day, start: b.start, title: b.title, displaced: s.displaced })));
   const validation = useMemo(() => validateSchedule(state), [state]);
   const blocks = validation.issues.filter((i) => i.level === 'block');
   const warns = validation.issues.filter((i) => i.level !== 'block');
@@ -139,7 +144,8 @@ export function Grade({ gameId, state }: ScreenProps) {
 
   const days = isDesktop && view === 'semana' ? [0, 1, 2, 3, 4, 5, 6] : [day];
   const height = 96 * slotPx;
-  const acervo = state.programs.filter((p) => p.stationId === ps.id && AIRABLE.includes(p.status) && GENRES[p.genre].group !== 'sistema' || (p.stationId === ps.id && p.genre === 'tapa_buraco' && p.status !== 'ended'));
+  // transmissões esportivas não entram no acervo: o horário é do jogo
+  const acervo = state.programs.filter((p) => p.stationId === ps.id && !p.flags.fixture && AIRABLE.includes(p.status) && GENRES[p.genre].group !== 'sistema' || (p.stationId === ps.id && p.genre === 'tapa_buraco' && p.status !== 'ended'));
 
   return (
     <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
@@ -182,6 +188,19 @@ export function Grade({ gameId, state }: ScreenProps) {
               <Button size="sm" variant="ghost" onClick={() => setPlacing(null)}>Cancelar</Button>
             </div>
           )}
+          {sportsWeek.length > 0 && (
+            <div className="rounded-theme border border-good/40 bg-good/10 px-3 py-2 text-xs">
+              <div className="font-semibold">⚽ Esporte ao vivo nesta semana</div>
+              <ul className="mt-1 space-y-0.5">
+                {sportsWeek.map((g) => (
+                  <li key={`${g.day}-${g.start}`}>
+                    <b>{DAY_SHORT[g.day]} {slotLabel(g.start)}</b> {g.title}
+                    {g.displaced.length > 0 && <span className="text-muted"> · mudam de horário por causa do jogo (e perdem um pouco de hábito): {g.displaced.join(', ')}</span>}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {preview && (
             <div className="flex flex-wrap items-center gap-3 rounded-theme bg-surface-2 px-3 py-2 text-xs">
               <span className="font-semibold">Prévia de {DAY_NAMES[preview.day].toLowerCase()}:</span>
@@ -203,6 +222,7 @@ export function Grade({ gameId, state }: ScreenProps) {
                   key={d}
                   day={d}
                   state={state}
+                  sports={sportsByDay[d]}
                   blocks={week[d]}
                   programs={programs}
                   slotPx={slotPx}
@@ -318,6 +338,7 @@ function TimeColumn({ height, slotPx }: { height: number; slotPx: number }) {
 function DayColumn(props: {
   day: number;
   state: GameState;
+  sports?: ReturnType<typeof sportsOverlayBlocks>;
   blocks: Block[];
   programs: Map<string, Program>;
   slotPx: number;
@@ -372,6 +393,17 @@ function DayColumn(props: {
         ))}
         {blocks.map((b) => (
           <BlockView key={`${b.start}-${b.programId}`} day={day} block={b} program={programs.get(b.programId)} slotPx={slotPx} past={past} preview={props.preview} onClick={() => props.onBlock(b)} hidden={props.draggingId === `block:${day}:${b.start}`} />
+        ))}
+        {/* esporte ao vivo: por cima da grade, sem arrastar (o horário é do jogo) */}
+        {props.sports?.blocks.map((b) => (
+          <div
+            key={`sp-${b.start}`}
+            title={`${b.title}${b.role === 'jogo' ? ' · ao vivo; a programação deste horário vai para depois do jogo' : ''}`}
+            className={`pointer-events-none absolute inset-x-0.5 z-[5] overflow-hidden rounded border px-1 text-[10px] font-semibold leading-tight ${b.role === 'jogo' ? 'border-good bg-[repeating-linear-gradient(45deg,color-mix(in_srgb,var(--good)_38%,var(--bg))_0_6px,color-mix(in_srgb,var(--good)_20%,var(--bg))_6px_12px)] text-text' : 'border-good/50 bg-[color-mix(in_srgb,var(--good)_16%,var(--bg))] text-muted'}`}
+            style={{ top: b.start * slotPx + 1, height: b.len * slotPx - 2 }}
+          >
+            {b.len * slotPx >= 14 ? `${b.role === 'jogo' ? '⚽ ' : ''}${b.title}` : ''}
+          </div>
         ))}
       </div>
     </div>

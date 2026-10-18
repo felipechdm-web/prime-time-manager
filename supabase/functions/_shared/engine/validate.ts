@@ -113,6 +113,7 @@ export function validateSchedule(state: GameState, schedule?: Block[][]): Valida
   // 4. cotas vendidas sem programa
   for (const d of state.deals) {
     if (d.status !== 'active' || d.startWeek > state.meta.weekIndex || d.endWeek < state.meta.weekIndex) continue;
+    if (d.contractId) continue; // cota esportiva: vale para as transmissões do direito, não para um programa da grade
     if (!ids.has(d.programId)) {
       const p = getProgram(state, d.programId);
       issues.push({ level: 'block', code: 'cota', text: `Cota de ${d.advertiser} vendida em "${p?.title ?? 'programa'}", que não está na grade.`, programId: d.programId });

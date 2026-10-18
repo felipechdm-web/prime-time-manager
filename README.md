@@ -97,6 +97,12 @@ prime-time-manager/
   Resultados por modelo de gols (Poisson: força, mando e fase), classificação, mata-mata com prorrogação e pênaltis,
   acesso e rebaixamento entre temporadas. A audiência de um jogo usa a fórmula da seção 8C.4 com a torcida de cada
   praça; jogos da seleção e finais aumentam a TV ligada. Atletas reais não aparecem: os lances falam em "o camisa 9".
+  Na grade (`engine/sportsTv.ts`): os direitos da largada viram contratos; a cada semana quem tem 1ª escolha escolhe
+  antes; o jogo entra ao vivo no horário dele, com pré e pós-jogo (herança), e a programação vai para depois
+  (deslocamentos custam hábito); estaduais passam só nas praças deles (nas outras, a grade normal); prorrogação e
+  pênaltis estouram a grade (evento com escolha: atrasar ou cortar o pós-jogo); obrigação de exibir 80% dos jogos
+  escolhidos; cotas esportivas por temporada; sublicenciamento das janelas de TV paga e streaming, uma vez por
+  contrato. O "Campeonato Nacional" genérico, a Copa antiga e o leilão de futebol ficam desligados com o esporte real.
 - **Modelos (v2, seção 17.5)**: todas as funções usam `claude-haiku-5-5` com esforço baixo e raciocínio desligado;
   cada função tem o seu `max_tokens` (`supabase/functions/_shared/game/llmConfig.ts`). O Sonnet 5.5 fica como
   modo premium desligado (`LLM_PREMIUM=on` liga, só na avaliação com a presidência). Tudo pode ser trocado por

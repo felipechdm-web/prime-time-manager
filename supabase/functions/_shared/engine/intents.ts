@@ -8,6 +8,7 @@ import { money } from './money.ts';
 import { clamp } from './rng.ts';
 import { blocksFromSlots, cloneWeek, placeBlock, slotArray } from './schedule.ts';
 import { makeContract } from './setup.ts';
+import { sublicenseSport } from './sportsTv.ts';
 import { getProgram, nextId, npcById, npcByRole, playerStation, pushTimeline } from './state.ts';
 import type { Block, GameState, Program } from './types.ts';
 import { validateSchedule } from './validate.ts';
@@ -35,7 +36,8 @@ export type Intent =
   | { type: 'invest_research' }
   | { type: 'retire' }
   | { type: 'tutorial'; step: number; done?: boolean }
-  | { type: 'ack_alert'; key: string };
+  | { type: 'ack_alert'; key: string }
+  | { type: 'sublicense_sport'; contractId: string };
 
 export interface IntentResult {
   ok: boolean;
@@ -378,6 +380,11 @@ export function applyIntent(state: GameState, intent: Intent): IntentResult {
       if (!state.alertsAck.includes(intent.key)) state.alertsAck.push(intent.key);
       if (state.alertsAck.length > 100) state.alertsAck.shift();
       return { ok: true, message: '' };
+    }
+    case 'sublicense_sport': {
+      // revende uma vez as janelas de TV paga e streaming de um direito esportivo (seção 8C.6)
+      const r = sublicenseSport(state, String(intent.contractId ?? ''));
+      return r.ok ? { ok: true, message: `${r.message} Entrada de ${money(era, r.value ?? 0)} no caixa da semana.` } : fail(r.message);
     }
   }
   return fail('Intenção desconhecida.');

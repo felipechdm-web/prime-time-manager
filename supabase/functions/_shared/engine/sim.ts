@@ -12,13 +12,14 @@ import { computeLiveMoments } from './live.ts';
 import { devProgress, refreshOffers, resolveAuctions } from './market.ts';
 import { processContracts } from './negotiation.ts';
 import { advanceSports, planCalendarChanges } from './sports.ts';
+import { assignBroadcasts, closeSportsWeek, decisiveBroadcast, HABIT_LOSS_PER_DISPLACEMENT, sellSportsCotas, weekDisplacements } from './sportsTv.ts';
 import { money } from './money.ts';
 import { boletimFallback, dayFallback, evaluationFallback } from './narrative.ts';
 import { buildWeekReport, PA, programResultsFromAcc } from './report.ts';
 import { clamp, round, rngFor } from './rng.ts';
 import { rivalStructure, rivalWeekly } from './rivals.ts';
 import type { CompetitorActionOut } from './rivals.ts';
-import { cloneWeek, habitKeyFor, programsInWeek } from './schedule.ts';
+import { cloneWeek, habitKeyFor, programsInWeek, slotArray } from './schedule.ts';
 import { addRealStation, freshWeekProgress, ratingAllowed, SCENARIOS, setupCopaYear } from './setup.ts';
 import {
   activeStations, avgWeeklyRevenue, difficultyMult, getProgram, npcById, npcByRole, playerStation, politicalCapital,
@@ -92,6 +93,8 @@ export function simulateNextDay(state: GameState, out: SimOutputs, live?: { prog
   if (live) wp.liveDecisions.push({ day, programId: live.programId, decisions: live.decisions });
   const order = activeStations(state).map((s) => s.id).join(',');
   const carry = wp.stationOrder.join(',') === order ? wp.carry : null;
+  // esporte real: os jogos do dia já têm placar quando o dia vai ao ar (prorrogação e pênaltis estouram a grade)
+  if (state.sports) advanceSports(state, addDays(state.meta.date, day + 1));
   const res = computeDay(state, day, { carry, liveDecisions: decisions });
   accumulateDay(state, res, out, day);
   wp.carry = res.carry.map((m) => m.map((r) => r.map((v) => round(v, 6))));
@@ -311,6 +314,18 @@ export function closeWeek(state: GameState, out: SimOutputs, opts: { warmup?: bo
   const warm = !!opts.warmup;
   const report = warm ? null : buildWeekReport(state, 'week');
 
+  // esporte real: jogos exibidos, prorrogações, obrigações (antes das finanças, por causa das multas) e deslocamentos
+  const sportsMoves = new Map<string, number>();
+  if (state.sports && !warm) {
+    const sw = closeSportsWeek(state);
+    wp.fines += sw.fines;
+    for (const n of sw.notes) inbox(state, { fromNpc: 'npc_comercial', subject: 'Esporte na grade', body: n, requiresAction: false, eventId: null, kind: 'mensagem' });
+    for (const st of stations) {
+      const plans = (state.schedules[st.id] ?? []).map((d) => slotArray(d));
+      for (const [id, n] of weekDisplacements(state, st.id, plans)) sportsMoves.set(id, (sportsMoves.get(id) ?? 0) + n);
+    }
+  }
+
   // finanças por estação
   const finances = new Map<string, WeekFinance>();
   for (const st of stations) {
@@ -416,6 +431,9 @@ export function closeWeek(state: GameState, out: SimOutputs, opts: { warmup?: bo
       }
       p.movesRecent = p.movesRecent.filter((w) => w >= week - 8);
     }
+    // deslocado por jogos: cada deslocamento custa parte do hábito (seção 8C.5)
+    const moved = sportsMoves.get(p.id);
+    if (moved) p.habitWeeks = Math.max(0, p.habitWeeks - HABIT_LOSS_PER_DISPLACEMENT * moved);
     // ciclo de vida
     if (airedNow && p.episodes.total !== null && !p.isRerun && p.episodes.aired >= p.episodes.total) {
       p.status = 'ended';
@@ -774,8 +792,14 @@ export function startWeek(state: GameState, out: SimOutputs, opts: { quiet?: boo
     pushTimeline(state, `"${p.title}" ficou pronto para estrear.`, 'programa');
   }
   for (const n of resolveAuctions(state)) inbox(state, { fromNpc: 'npc_comercial', subject: 'Resultado do leilão', body: n, requiresAction: false, eventId: null, kind: 'mensagem' });
-  // esporte real (v2): a liga muda horários e adia jogos das próximas semanas
-  if (state.sports) planCalendarChanges(state, state.meta.date);
+  // esporte real (v2): a liga muda horários e adia jogos; cada emissora escolhe os jogos da semana; cotas da temporada
+  if (state.sports) {
+    planCalendarChanges(state, state.meta.date);
+    assignBroadcasts(state);
+    for (const n of sellSportsCotas(state)) inbox(state, { fromNpc: 'npc_comercial', subject: 'Cotas do esporte', body: n, requiresAction: false, eventId: null, kind: 'mensagem' });
+    const decisive = opts.quiet ? null : decisiveBroadcast(state);
+    if (decisive) fireEvent(state, 'esporte_prorrogacao', {}, { jogo: decisive.title });
+  }
   // contratos de direitos (v2): parcelas, horário prometido e vencimentos
   if (state.rightsContracts?.length) {
     const rc = processContracts(state);
@@ -823,7 +847,7 @@ function calendarEvents(state: GameState): void {
     state.flags[`upfront_${year}`] = true;
     fireEvent(state, 'upfront', {});
   }
-  if (COPAS[year] && !state.flags[`copa_${year}_${ps.id}`] && state.flags[`copaoffer_${year}`] === undefined) {
+  if (COPAS[year] && !state.catalog?.sports && !state.flags[`copa_${year}_${ps.id}`] && state.flags[`copaoffer_${year}`] === undefined) {
     const start = COPAS[year].start;
     const weeksTo = (Date.parse(start) - Date.parse(date)) / (7 * 86400000);
     if (weeksTo <= 16 && weeksTo > 3) {

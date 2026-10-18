@@ -707,6 +707,17 @@ export const EVENT_TEMPLATES: EventTemplate[] = [
     defaultOption: 'passar',
   },
   {
+    id: 'esporte_prorrogacao', category: 'esporte', title: 'Jogo decisivo pode estourar a grade', severity: 'leve', tone: 'neutro',
+    subject: 'none', trigger: [], calendar: true,
+    baseProb: 0, eras: U, universe: U, speaker: 'npc_comercial',
+    scene: 'Esta semana tem mata-mata: {jogo}. Se empatar, vai para a prorrogação ou para os pênaltis e o jogo passa do horário. "Diretor, se estourar, a gente atrasa a novela ou corta o pós-jogo? O patrocinador do pós-jogo vai reclamar, mas a novela tem hora marcada", diz Marta.',
+    options: [
+      { id: 'atrasar', label: 'Atrasar a programação seguinte', effects: { npc: [{ target: 'comercial', mood: 3 }] } },
+      { id: 'cortar', label: 'Cortar o pós-jogo para não atrasar a grade', effects: { npc: [{ target: 'comercial', mood: -4 }, { target: 'artistico', mood: 4 }] } },
+    ],
+    defaultOption: 'atrasar',
+  },
+  {
     id: 'hgpe_aviso', category: 'regulacao', title: 'Horário eleitoral começa na semana que vem', severity: 'leve', tone: 'neutro',
     subject: 'none', trigger: [], calendar: true,
     baseProb: 0, eras: U, universe: U, speaker: 'npc_juridico',

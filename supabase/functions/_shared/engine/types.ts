@@ -292,7 +292,8 @@ export interface AdDeal {
   id: string;
   advertiser: string;
   kind: 'quota' | 'merch';
-  programId: string;
+  programId: string; // vazio nas cotas esportivas, que valem para o direito inteiro (contractId)
+  contractId?: string; // cota de um direito esportivo (Fase 6.4)
   weeklyValue: number;
   guaranteedPoints: number;
   startWeek: number;
@@ -465,7 +466,7 @@ export interface CatalogSlotSnap {
 export interface CatalogSnapshot {
   titles: CatalogTitleSnap[];
   grids: { stationKey: string; referenceMonth: string; slots: CatalogSlotSnap[] }[];
-  rights: { productRef: string; holderStationKey: string; validFrom: string | null; validTo: string | null; exclusive: boolean; kind?: string }[];
+  rights: { productRef: string; holderStationKey: string; validFrom: string | null; validTo: string | null; exclusive: boolean; kind?: string; terms?: Record<string, unknown> }[];
   holders: CatalogHolderSnap[];
   sports?: SportsCatalogSnap; // v2 (Fase 6.4): competições, clubes e torcidas aprovados
 }
@@ -516,6 +517,9 @@ export interface SportsState {
   picks: Record<string, string[]>; // código do jogo -> emissoras que transmitem (Fase 6.4, passo 4)
   done: Record<string, SeasonSummary>; // "competição|temporada" encerrada
   checkedUntil: string; // até que data as mudanças de calendário já foram sorteadas
+  windows?: SportsWindow[]; // transmissões da semana corrente (todas as emissoras)
+  windowsWeek?: number;
+  notes?: string[]; // avisos da semana (prorrogação, horário estourado) para a caixa de entrada
 }
 
 // player de direitos (Fase 6.3): perfil de negociação e representante fictício vêm do catálogo
@@ -567,6 +571,39 @@ export interface RightsContract {
   status: 'ativo' | 'encerrado' | 'rescindido' | 'inadimplente';
   programId?: string | null;
   negotiationId?: string | null;
+  sport?: SportContractInfo; // direito esportivo (Fase 6.4)
+}
+
+// regras de um direito esportivo: quais jogos a emissora pode transmitir e o que deve cumprir
+export interface SportContractInfo {
+  comp: string;
+  pacote?: string | null; // bloco da liga (libra, lfu) quando o mandante define a plataforma
+  mandantes: { kind: 'bloco'; bloco: string } | { kind: 'clubes'; ids: string[] } | { kind: 'resto' } | null;
+  perRound: number; // jogos por rodada (ou por dia, em eventos)
+  choice: number; // ordem de escolha: 1 escolhe antes de 2
+  regional: boolean; // pode passar jogos diferentes em cada praça no mesmo horário
+  pracas: string[] | null; // só nessas praças (estaduais)
+  exclusive: boolean;
+  includeBrazil: boolean; // eventos: os jogos da seleção sempre entram
+  gpsLive: number | null; // F1: GPs ao vivo na TV aberta
+  platforms: string[];
+  sublicensable: boolean; // tem janelas além da TV aberta para revender
+  sublicensed: { date: string; value: number } | null;
+  entitled: number; // jogos a que a emissora teve direito (escolhidos)
+  aired: number; // jogos que foram ao ar
+  checkedSeasons: string[]; // temporadas com obrigação já conferida
+  cotaSeasons: string[]; // temporadas com cotas de patrocínio já vendidas
+}
+
+// uma transmissão da semana: horário na grade, jogo principal e o jogo de cada praça (transmissão regionalizada)
+export interface SportsWindow {
+  station: string;
+  contract: string;
+  date: string; // dia de TV (das 6h às 6h)
+  day: number; // 0 = segunda da semana corrente
+  start: number; // slot do início do jogo
+  main: string; // código do jogo principal
+  byMarket: string[]; // código do jogo em cada praça (mesma ordem de MARKETS)
 }
 
 export interface Divergence {

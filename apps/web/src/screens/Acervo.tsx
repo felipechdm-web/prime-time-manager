@@ -40,7 +40,7 @@ export function Acervo({ gameId, state }: ScreenProps) {
   const openProgram = useUI((s) => s.openProgram);
   const ps = state.stations.find((s) => s.isPlayer)!;
   const era = state.meta.era;
-  const mine = state.programs.filter((p) => p.stationId === ps.id && GENRES[p.genre].group !== 'sistema');
+  const mine = state.programs.filter((p) => p.stationId === ps.id && GENRES[p.genre].group !== 'sistema' && !p.flags.fixture); // jogos ficam na grade, não no acervo
   const g = GROUPS.find((x) => x.id === group)!;
   const list = mine.filter(g.filter).filter((p) => !q || p.title.toLowerCase().includes(q.toLowerCase()) || GENRES[p.genre].name.toLowerCase().includes(q.toLowerCase()));
 

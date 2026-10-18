@@ -20,6 +20,7 @@ const STATION_POWER_W = 0.7 * (1 - 0.1 * 4);
 const RETENTION_IN = 0.82 - 0.02 * 4;
 const REGIONAL_W = 1.1;
 const NOISE_SCALE = 0.11;
+const SPORT_HABIT = 0.75; // hábito do torcedor com o dia e o horário do jogo (equivale a 6 semanas de hábito)
 
 export interface DayResult {
   date: string;
@@ -131,6 +132,10 @@ export function computeDay(state: GameState, day: number, opts: DayOptions): Day
   const slotPrograms: (string | null)[][] = stations.map((st) =>
     dayPlanWithOverlays(state, st.id, day, schedules[st.id] ?? cloneWeek([[], [], [], [], [], [], []])),
   );
+  // esporte real: grade sem os jogos, para as praças que não recebem a transmissão (estadual de outro estado)
+  const basePrograms: (string | null)[][] | null = state.sports?.windows?.length
+    ? stations.map((st) => dayPlanWithOverlays(state, st.id, day, schedules[st.id] ?? cloneWeek([[], [], [], [], [], [], []]), { noSports: true }))
+    : null;
 
   // chaves de hábito da semana corrente
   const habitKeys = new Map<string, string>();
@@ -200,6 +205,8 @@ export function computeDay(state: GameState, day: number, opts: DayOptions): Day
       pu = { base: q + b + h - f + t + noise + mods, appeal, group: g.group, genre: p.genre, noise, parts: { q, b, h, f, t }, appealRaw, station: stationTermBase[stIdx] };
       const mi = state.sports ? programMarketInterest(state, p) : null;
       if (mi) {
+        // o jogo tem hábito próprio ("quarta é dia de futebol"), mesmo sendo um programa novo a cada semana
+        if (!p.flags.sportsRole) pu.base += W.h * SPORT_HABIT;
         pu.market = mi.markets;
         pu.marketPnt = mi.pnt;
         pu.prof = SEGMENTS.map((s) => p.profile[s]);
@@ -254,7 +261,8 @@ export function computeDay(state: GameState, day: number, opts: DayOptions): Day
         const pid = slots[t];
         let e = t + 1;
         while (e < SLOTS_PER_DAY && slots[e] === pid) e++;
-        const code = pid ? getProgram(state, pid)?.flags.fixture : null;
+        const prog = pid ? getProgram(state, pid) : null;
+        const code = prog && !prog.flags.sportsRole ? prog.flags.fixture : null; // pré e pós-jogo não ligam TVs
         const fx = typeof code === 'string' ? fixtureByCode(state, code) : null;
         if (fx) eventAirs.push({ from: t, to: e, fx });
         t = e;
@@ -318,6 +326,16 @@ export function computeDay(state: GameState, day: number, opts: DayOptions): Day
       }
     }
 
+    // o que cada emissora mostra nesta praça: o jogo, ou a grade normal onde o jogo não passa
+    let plan = slotPrograms;
+    if (basePrograms && mIdx >= 0) {
+      plan = slotPrograms.map((slots, c) => slots.map((pid, t) => {
+        if (!pid) return pid;
+        const pu = programUtility(pid, c);
+        return pu.market && Number.isNaN(pu.market[mIdx]) ? basePrograms[c][t] : pid;
+      }));
+    }
+
     for (let t = 0; t < SLOTS_PER_DAY; t++) {
       const band = bandOfSlot(t);
       const hour = Math.floor(slotClockMinutes(t) / 60);
@@ -334,7 +352,7 @@ export function computeDay(state: GameState, day: number, opts: DayOptions): Day
         const tleS = tle * segW[s];
         let sumExp = 0;
         for (let c = 0; c < S; c++) {
-          const pid = slotPrograms[c][t];
+          const pid = plan[c][t];
           let u: number;
           if (!pid) {
             u = -1.2 + stTerm[c];
@@ -363,8 +381,8 @@ export function computeDay(state: GameState, day: number, opts: DayOptions): Day
           if (first) r = 0;
           else if (c === S) r = 0.6;
           else {
-            const cur = slotPrograms[c][t];
-            const prev = t > 0 ? slotPrograms[c][t - 1] : null;
+            const cur = plan[c][t];
+            const prev = t > 0 ? plan[c][t - 1] : null;
             if (!cur) r = 0.2;
             else if (cur === prev || (t === 0 && havePrev)) r = rIn;
             else {

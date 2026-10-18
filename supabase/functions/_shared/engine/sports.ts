@@ -20,8 +20,9 @@ const STRENGTH_K = 0.022; // 10 pontos de força = 25% mais gols esperados
 const HOME_ADV = 1.22;
 const AWAY_PEN = 0.9;
 const NEUTRAL_BASE = 0.4; // ν0: interesse de quem não torce para nenhum dos dois
-const FAN_K = 2.2; // κ: peso da torcida da praça no interesse
+const FAN_K = 2.6; // κ: peso da torcida da praça no interesse
 const TV_CAPACITY = 2; // jogos por horário de TV aberta numa rodada (a Globo regionaliza)
+const OUT_OF_AREA = 0.6; // fora da área do estadual: apelo de um programa comum da grade local
 const MATCH_SLOTS = 8; // 2 horas de transmissão (15 min por slot); prorrogação soma 2
 const TIER_STRENGTH: Record<string, number> = {
   estrangeiro_forte: 82, estrangeiro_medio: 70, estrangeiro_fraco: 58, pequeno: 46,
@@ -66,6 +67,7 @@ export interface Fixture {
   neutral: boolean;
   extraTime: boolean; // mata-mata em jogo único com prorrogação antes dos pênaltis
   label?: string; // GP
+  live?: boolean; // GP ao vivo na TV aberta
   slots: number;
   status: 'agendado' | 'adiado' | 'encerrado';
   score?: MatchScore;
@@ -272,7 +274,13 @@ function leagueWindows(r: Rules, need: number, busyWeekends: { de: string; ate: 
   const pickEven = (arr: string[], k: number) => (k >= arr.length ? arr : Array.from({ length: k }, (_, i) => arr[Math.floor((i * arr.length) / k)]));
   let chosen: string[];
   if (weekends.length >= need) chosen = pickEven(weekends, need);
-  else chosen = [...weekends, ...pickEven(mids, need - weekends.length)];
+  else {
+    // faltam fins de semana: primeiro as quartas do período dos estaduais (como no calendário real), depois as demais
+    const extra = need - weekends.length;
+    const inBusy = mids.filter((d) => busy(addDays(d, 3)));
+    const first = inBusy.slice(0, extra);
+    chosen = [...weekends, ...first, ...pickEven(mids.filter((d) => !first.includes(d)), extra - first.length)];
+  }
   chosen.sort();
   // se faltar data, as rodadas restantes vão para as semanas seguintes ao fim
   let extra = chosen.at(-1) ?? r.fim;
@@ -558,7 +566,7 @@ function buildSeason(state: GameState, comp: SportsCompetitionSnap, season: stri
   let table: string[] | undefined;
 
   if (tipo === 'gp') {
-    for (const g of rules.gps ?? []) mk(ctx, { key: `gp:${g.id}`, phase: 'gp', phaseName: g.nome, round: 1, leg: 0, date: g.data, time: g.hora, home: 'gp', away: null, neutral: true, extraTime: false, label: g.nome });
+    for (const g of rules.gps ?? []) mk(ctx, { key: `gp:${g.id}`, phase: 'gp', phaseName: g.nome, round: 1, leg: 0, date: g.data, time: g.hora, home: 'gp', away: null, neutral: true, extraTime: false, label: g.nome, live: !!g.tv_aberta });
     const done = ctx.out.length > 0 && ctx.out.every((f) => f.score);
     return { fixtures: ctx.out, complete: done, champion: null, runnerUp: null };
   }
@@ -900,7 +908,9 @@ export function advanceSports(state: GameState, until: string): string[] {
         const built = seasonCached(state, comp, season);
         const pending = built.fixtures.filter((f) => !f.score && f.date < until).sort((a, b) => `${a.date}${a.time}${a.leg}`.localeCompare(`${b.date}${b.time}${b.leg}`));
         if (!pending.length) {
-          if (built.complete && built.fixtures.length) {
+          // a temporada vira resumo uma semana depois do último jogo (a transmissão da final ainda usa o jogo)
+          const last = built.fixtures.reduce((m, f) => (f.date > m ? f.date : m), '');
+          if (built.complete && built.fixtures.length && addDays(last, 8) <= until) {
             ss.done[key] = { champion: built.champion, runnerUp: built.runnerUp, ...(built.table ? { table: built.table } : {}) };
             if (built.champion) notes.push(`${comp.name} ${season}: ${teamName(state, built.champion)} campeão.`);
             const prefix = `${comp.id}:${season}:`;
@@ -933,7 +943,8 @@ export function planCalendarChanges(state: GameState, today: string): { fixture:
   for (const f of fixturesBetween(state, from, horizon)) {
     if (f.score || f.change || !f.away || f.phase === 'final') continue;
     const comp = competitionOf(state, f.comp)!;
-    if (comp.kind === 'evento' || comp.kind === 'gp') continue;
+    // a CBF, as ligas e as federações mexem nos jogos daqui; torneios internacionais têm datas fixas
+    if (comp.kind === 'evento' || comp.kind === 'gp' || comp.scope === 'continental' || comp.scope === 'mundial') continue;
     const rng = rngFor(state.meta.seed, 'mudanca', f.code);
     const roll = rng.next();
     const rules = rulesFor(comp, f.season);
@@ -961,6 +972,15 @@ export function planCalendarChanges(state: GameState, today: string): { fixture:
   return out;
 }
 
+// o jogo está num horário típico de TV aberta da competição (ex.: quarta 21h30, domingo 16h)
+export function isTvKickoff(state: GameState, f: Fixture): boolean {
+  const comp = competitionOf(state, f.comp);
+  if (!comp) return false;
+  if (!f.away) return !!f.live;
+  const r = rulesFor(comp, f.season);
+  return (r?.horarios ?? []).some((h) => h.tv_aberta && h.hora === f.time && parseDays(h.dias).includes(dow(f.date)));
+}
+
 // ===== audiência (seção 8C.4) =====
 function hourFactor(f: Fixture): number {
   const [h, m] = f.time.split(':').map(Number);
@@ -982,6 +1002,13 @@ export function phaseFactor(f: Fixture): number {
   return F;
 }
 
+// a praça recebe o jogo? (estaduais só passam nas praças do estado; nas outras a emissora segue a grade normal)
+export function inArea(state: GameState, f: Fixture, marketIdx: number): boolean {
+  if (marketIdx < 0) return true;
+  const pracas = competitionOf(state, f.comp)?.format.pracas as string[] | undefined;
+  return !pracas?.length || pracas.includes(MARKETS[marketIdx].code);
+}
+
 // I = B · (ν0 + κ·ΣT) · F · R · H, com T = torcida dos dois clubes na praça (ou interesse neutro sem clube brasileiro)
 export function matchInterest(state: GameState, f: Fixture, marketIdx: number): number {
   const sp = state.catalog?.sports;
@@ -992,8 +1019,9 @@ export function matchInterest(state: GameState, f: Fixture, marketIdx: number): 
   const pracas = comp.format.pracas as string[] | undefined;
   const neutral = Number(comp.format.interesse_neutro ?? 0);
   const fans = fanShare(sp, f.home, market, comp) + fanShare(sp, f.away, market, comp);
+  // estadual fora do seu estado: a emissora mostra a programação normal da praça (apelo de um programa comum)
+  if (pracas?.length && !pracas.includes(market)) return OUT_OF_AREA;
   let I = (comp.baseAppeal / 100) * (NEUTRAL_BASE + FAN_K * (fans + neutral)) * phaseFactor(f) * rivalry(sp, f.home, f.away).weight * hourFactor(f);
-  if (pracas?.length && !pracas.includes(market)) I *= 0.35; // estadual fora do seu estado
   if (comp.kind === 'gp') {
     if (comp.format.piloto_brasileiro_no_grid) I *= 1.15;
     if (/São Paulo/.test(f.label ?? '')) I *= 1.35;
@@ -1005,7 +1033,7 @@ export function matchInterest(state: GameState, f: Fixture, marketIdx: number): 
 export function eventTleMult(state: GameState, f: Fixture, marketIdx: number): number {
   const sp = state.catalog?.sports;
   const comp = competitionOf(state, f.comp);
-  if (!sp || !comp || !f.away) return 1;
+  if (!sp || !comp || !f.away || !inArea(state, f, marketIdx)) return 1;
   if (f.home === 'selecao:brasil' || f.away === 'selecao:brasil') return SELECAO_E[f.phase] ?? 1.08;
   if (f.phase !== 'final') return 1;
   const market = marketIdx >= 0 ? MARKETS[marketIdx].code : null;
@@ -1043,14 +1071,44 @@ export function ensureMatchProgram(state: GameState, stationId: string, f: Fixtu
   return p;
 }
 
-// interesse do jogo por praça para um programa de transmissão (null se não é jogo)
+// interesse do jogo por praça para um programa de transmissão (null se não é jogo). Transmissão regionalizada:
+// cada praça vê o seu jogo (flags.fixtures). Pré e pós-jogo valem uma fração do interesse do jogo. Praça que não
+// recebe o jogo (estadual de outro estado) fica com NaN: o motor de audiência usa a grade normal da emissora ali.
+const ROLE_SHARE: Record<string, number> = { pre: 0.5, pos: 0.6 };
 export function programMarketInterest(state: GameState, p: Program): { markets: number[]; pnt: number; fixture: Fixture } | null {
   const code = p.flags.fixture;
   if (typeof code !== 'string' || !sportsActive(state)) return null;
   const f = fixtureByCode(state, code);
   if (!f) return null;
-  const markets = MARKETS.map((_, i) => matchInterest(state, f, i));
-  return { markets, pnt: markets.reduce((s, v, i) => s + v * MARKET_WEIGHTS[i], 0), fixture: f };
+  const perMarket = typeof p.flags.fixtures === 'string' ? String(p.flags.fixtures).split('|') : [];
+  const k = ROLE_SHARE[String(p.flags.sportsRole ?? '')] ?? 1;
+  const markets = MARKETS.map((_, i) => {
+    if (perMarket.length && !perMarket[i]) return Number.NaN; // nenhum jogo da transmissão passa nesta praça
+    const local = (perMarket[i] && perMarket[i] !== code ? fixtureByCode(state, perMarket[i]) : null) ?? f;
+    return inArea(state, local, i) ? matchInterest(state, local, i) * k : Number.NaN;
+  });
+  return { markets, pnt: markets.reduce((s, v, i) => s + (Number.isNaN(v) ? OUT_OF_AREA : v) * MARKET_WEIGHTS[i], 0), fixture: f };
+}
+
+// última data prevista da temporada (calendário do catálogo, mesmo que as fases finais ainda não tenham jogos)
+export function seasonEndDate(state: GameState, compId: string, season: string): string | null {
+  const comp = competitionOf(state, compId);
+  const rules = comp ? rulesFor(comp, season) : null;
+  if (!rules) return null;
+  let last: string | null = null;
+  const scan = (v: unknown) => {
+    if (typeof v === 'string' && ISO.test(v)) { if (!last || v > last) last = v; } else if (Array.isArray(v)) v.forEach(scan); else if (v && typeof v === 'object') Object.entries(v).forEach(([k, x]) => { if (k !== 'pausas') scan(x); });
+  };
+  scan(rules);
+  return last;
+}
+
+// temporada em curso de uma competição numa data (a europeia vira em julho)
+export function seasonAt(state: GameState, compId: string, date: string): string {
+  const comp = competitionOf(state, compId);
+  const y = yearOf(date);
+  if (!comp || !isEuropean(comp)) return String(y);
+  return date.slice(5) >= '07-01' ? euroKey(y + 1) : euroKey(y);
 }
 
 export { daysBetween as sportsDaysBetween, dow as sportsDow };

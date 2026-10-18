@@ -279,6 +279,7 @@ function makeOfferRaw(state: GameState, kind: MarketOffer['kind'], rng: Rng, opt
       return o;
     }
     case 'leilao': {
+      if (state.catalog?.sports) return null; // esporte real: os direitos são negociados com as ligas reais
       const o = baseOffer(state, rng, kind, 'futebol', 75, 88);
       const next = year + 1;
       o.title = `Leilão: Campeonato Nacional ${next}`;

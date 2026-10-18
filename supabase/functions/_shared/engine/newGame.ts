@@ -5,6 +5,7 @@ import { money } from './money.ts';
 import { initialContracts } from './negotiation.ts';
 import { createWorld, SCENARIOS } from './setup.ts';
 import { initSports } from './sports.ts';
+import { createSportsContracts } from './sportsTv.ts';
 import type { NewGameInput } from './setup.ts';
 import { firstWeekSetup, runWarmup } from './sim.ts';
 import type { SimOutputs } from './sim.ts';
@@ -16,7 +17,10 @@ import { lockSignatures } from './validate.ts';
 export function newGame(input: NewGameInput): { state: GameState; outputs: SimOutputs } {
   const state = createWorld(input);
   if (state.catalog) initialContracts(state); // exclusividades reais da largada viram contratos ativos (seção 8A.6)
-  if (state.catalog?.sports) initSports(state); // esporte real (seção 8C): calendário e jogos anteriores à largada
+  if (state.catalog?.sports) {
+    initSports(state); // esporte real (seção 8C): calendário e jogos anteriores à largada
+    createSportsContracts(state); // direitos esportivos da largada (mapa da seção 8C.2) viram contratos
+  }
   lockSignatures(state);
   runWarmup(state);
   const outputs = firstWeekSetup(state);

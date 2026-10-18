@@ -32,7 +32,7 @@ export function Comercial({ gameId, state }: ScreenProps) {
   const ratio = state.ytd.weeks > 0 ? f.ytdRevenue / prorated : (lw?.revenue ?? 0) / (f.annualRevenueTarget / 52);
   const idx = nominal(era, 1);
   const chart = ps.history.filter((h) => h.w >= 0).slice(-16).map((h) => ({ w: `S${h.w + 1}`, receita: Math.round((h.rev * idx) / 1e5) / 10, custo: Math.round((h.cost * idx) / 1e5) / 10 }));
-  const onAir = state.programs.filter((p) => p.stationId === ps.id && p.status === 'on_air' && p.price30s > 0).sort((a, b) => b.price30s - a.price30s);
+  const onAir = state.programs.filter((p) => p.stationId === ps.id && p.status === 'on_air' && p.price30s > 0 && !p.flags.sportsRole).sort((a, b) => b.price30s - a.price30s);
   const deals = state.deals.filter((d) => d.status === 'active' && d.endWeek >= state.meta.weekIndex);
   const dirty = tableMult !== f.tableMult || maxDisc !== f.maxDiscount || adMin !== f.adMinutes;
   const active = state.meta.status === 'active';
@@ -104,12 +104,13 @@ export function Comercial({ gameId, state }: ScreenProps) {
           <div className="space-y-2">
             {deals.map((d) => {
               const p = state.programs.find((x) => x.id === d.programId);
+              const contract = d.contractId ? state.rightsContracts?.find((c) => c.id === d.contractId) : null;
               const last = p?.stats.at(-1)?.pts ?? 0;
               const ok = last >= d.guaranteedPoints;
               return (
                 <div key={d.id} className="flex flex-wrap items-center justify-between gap-2 rounded-theme bg-surface-2 px-3 py-2 text-sm">
                   <div>
-                    <div className="font-semibold">{d.advertiser} em "{p?.title}"</div>
+                    <div className="font-semibold">{contract ? `${d.advertiser.replace(/ \(cota .*\)$/, '')} nas transmissões de ${contract.label}` : `${d.advertiser} em "${p?.title}"`}</div>
                     <div className="text-xs text-muted">{moneyEra(era, d.weeklyValue)}/semana até a semana {d.endWeek + 1} · entrega mínima {fmtPts(d.guaranteedPoints)} pts</div>
                   </div>
                   <Badge tone={ok ? 'good' : 'bad'}>{ok ? 'entregando' : `abaixo (${fmtPts(last)})`}</Badge>

@@ -6,11 +6,14 @@ import { useQuery } from '@tanstack/react-query';
 import { GENRES } from '@engine/catalog/genres.ts';
 import { ARGUMENT_TAGS } from '@engine/negotiation.ts';
 import type { NegPublic } from '@engine/negotiation.ts';
+import { applyIntent } from '@engine/intents.ts';
+import type { Intent } from '@engine/intents.ts';
+import { sublicenseQuote } from '@engine/sportsTv.ts';
 import { formatDate } from '@engine/time.ts';
-import type { BandId, GenreId, RightsContract, TermSheet } from '@engine/types.ts';
+import type { BandId, GameState, GenreId, RightsContract, TermSheet } from '@engine/types.ts';
 import { NEG_AGENDA_COST } from '@game/negotiationHandlers.ts';
 import { backendSync } from '../lib/backend.ts';
-import { invalidateGameData, useAction, useRows } from '../lib/queries.ts';
+import { invalidateGameData, queryClient, setGameState, useAction, useRows } from '../lib/queries.ts';
 import { go, useRoute } from '../lib/router.ts';
 import { useUI } from '../lib/ui.ts';
 import { moneyEra, fmtPts } from '../lib/format.ts';
@@ -441,6 +444,25 @@ function Contratos({ gameId, state }: ScreenProps) {
   const others = all.filter((c) => c.stationId !== ps.id && c.status === 'ativo');
   const holderName = (id: string | null) => state.catalog?.holders.find((h) => h.id === id)?.name ?? id ?? '—';
   const era = state.meta.era;
+  const toast = useUI((s) => s.toast);
+  const { run, busy } = useAction(gameId);
+  // sublicenciamento (seção 8C.6): aplica no navegador e confirma no servidor, como as mudanças da grade
+  const sublicense = async (contractId: string, label: string, value: number) => {
+    if (!window.confirm(`Revender as janelas de TV paga e streaming de ${label} por ${moneyEra(era, value)}? Só dá para fazer uma vez por contrato; a TV aberta continua com você.`)) return;
+    const intent: Intent = { type: 'sublicense_sport', contractId };
+    const local: GameState = structuredClone(state);
+    const r = applyIntent(local, intent);
+    if (!r.ok) {
+      toast('error', r.message);
+      return;
+    }
+    setGameState(gameId, local);
+    const res = await run<{ result: { ok: boolean; message: string } }>('apply-intent', { intent });
+    if (!res || !res.result.ok) {
+      if (res) toast('error', res.result.message);
+      await queryClient.invalidateQueries({ queryKey: ['game', gameId] });
+    } else toast('success', r.message);
+  };
   if (!all.length) return <Empty title="Nenhum contrato de direitos">Nas partidas do Brasil real, as exclusividades reais da largada aparecem aqui, junto com os contratos que você assinar.</Empty>;
 
   const ContractCard = ({ c, own }: { c: RightsContract; own: boolean }) => {
@@ -471,6 +493,19 @@ function Contratos({ gameId, state }: ScreenProps) {
             <span key={i} className="col-span-2 flex justify-between"><span className="text-muted">Horário prometido: {BANDS.find((b) => b.id === o.band)?.label.split(' (')[0] ?? o.band}</span><span className={o.missed ? 'text-bad' : 'text-good'}>{o.met} semana(s) cumprida(s){o.missed ? ` · ${o.missed} fora (multa)` : ''}</span></span>
           ))}
         </div>
+        {c.sport && own && (
+          <div className="space-y-1.5 border-t border-border pt-2 text-xs">
+            <div className="flex justify-between"><span className="text-muted">Jogos nesta temporada</span><span className="tabular">{c.sport.aired} exibido(s) de {c.sport.entitled} escolhido(s)</span></div>
+            {c.sport.sublicensed ? (
+              <div className="text-muted">TV paga e streaming revendidos em {formatDate(c.sport.sublicensed.date)} por {moneyEra(era, c.sport.sublicensed.value)}.</div>
+            ) : (() => {
+              const q = sublicenseQuote(state, c.id);
+              return q.ok ? (
+                <Button size="sm" variant="ghost" busy={busy} onClick={() => void sublicense(c.id, c.label, q.value)}>Sublicenciar TV paga e streaming ({moneyEra(era, q.value)})</Button>
+              ) : <div className="text-muted">Sublicenciamento: {q.reason}</div>;
+            })()}
+          </div>
+        )}
         {own && prog && <Button size="sm" variant="ghost" onClick={() => openProgram(prog.id)}>Abrir a ficha de "{prog.title}"</Button>}
       </div>
     );

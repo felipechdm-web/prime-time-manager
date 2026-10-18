@@ -42,6 +42,7 @@ export function buildCatalogSnapshot(rows: { titles: Row[]; templates: Row[]; ri
       validTo: str(r.valid_to)?.slice(0, 10) ?? null,
       exclusive: !!terms.exclusividade && terms.tipo !== 'relacionamento',
       ...(terms.tipo === 'relacionamento' || terms.tipo === 'esporte' ? { kind: String(terms.tipo) } : {}),
+      ...(terms.tipo === 'esporte' ? { terms } : {}), // o motor esportivo lê pacote, escolha, praças e plataformas
     };
   }).sort((a, b) => `${a.productRef}${a.holderStationKey}`.localeCompare(`${b.productRef}${b.holderStationKey}`));
   const holders = rows.holders.map((r): CatalogHolderSnap => {

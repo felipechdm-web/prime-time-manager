@@ -4,6 +4,7 @@ import { GENRES } from './catalog/genres.ts';
 import { getProgram, nextId } from './state.ts';
 import type { Block, GameState, Program } from './types.ts';
 import { addDays, copaMatches, COPAS, inHgpe, SLOTS_PER_DAY, yearOf } from './time.ts';
+import { sportsDayPlan } from './sportsTv.ts';
 
 export function emptyWeek(): Block[][] {
   return [[], [], [], [], [], [], []];
@@ -148,7 +149,7 @@ export function brazilMaxStage(state: GameState, year: number): number {
 }
 
 // devolve a grade de um dia com as sobreposições obrigatórias aplicadas
-export function dayPlanWithOverlays(state: GameState, stationId: string, day: number, week: Block[][]): (string | null)[] {
+export function dayPlanWithOverlays(state: GameState, stationId: string, day: number, week: Block[][], opts: { noSports?: boolean } = {}): (string | null)[] {
   const slots = slotArray(week[day] ?? []);
   const date = addDays(state.meta.date, day);
   const station = state.stations.find((s) => s.id === stationId);
@@ -160,6 +161,11 @@ export function dayPlanWithOverlays(state: GameState, stationId: string, day: nu
       const p = ensureCopaProgram(state, stationId, year);
       for (let i = 0; i < 9; i++) if (m.slot + i < SLOTS_PER_DAY) slots[m.slot + i] = p.id;
     }
+  }
+  // esporte real (v2): jogos ao vivo no horário deles, com pré e pós-jogo; a programação vai para depois
+  if (state.sports?.windows?.length && !opts.noSports) {
+    const plan = sportsDayPlan(state, stationId, day, slots);
+    for (let s = 0; s < SLOTS_PER_DAY; s++) slots[s] = plan.slots[s];
   }
   // HGPE: segunda a sábado, 13h e 20h30, só TV aberta
   if (station && station.kind === 'open' && day <= 5 && inHgpe(date)) {

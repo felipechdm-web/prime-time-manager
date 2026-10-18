@@ -786,10 +786,12 @@ export function createWorld(input: NewGameInput): GameState {
   state.meta.playerStationId = playerSt.id;
   if (input.player.background === 'produtor_auditorio') playerSt.reputation.critics -= 5;
 
-  // direitos de futebol: hegemônica e jornalística/esportiva
+  // direitos de futebol: hegemônica e jornalística/esportiva. Com o esporte real do catálogo (Fase 6.4), o
+  // "Campeonato Nacional" genérico não existe: os jogos vêm dos contratos reais
+  const realSports = input.universe === 'real' && !!input.catalog?.sports?.competitions.length;
   for (const st of state.stations) {
     if (st.archetype === 'hegemonica' || st.archetype === 'jornalistica_esportiva') st.footballUntilYear = st.isPlayer ? input.startYear : 9999;
-    if (st.kind === 'pay') st.footballUntilYear = null;
+    if (st.kind === 'pay' || realSports) st.footballUntilYear = null;
   }
 
   // catálogo real aprovado (v2): só no Brasil real
@@ -848,6 +850,7 @@ export function addRealStation(state: GameState, def: { key: string; name: strin
 
 export function setupCopaYear(state: GameState, year: number): void {
   if (!COPAS[year]) return;
+  if (state.catalog?.sports?.competitions.length) return; // esporte real: a Copa vem do calendário e dos contratos
   const rng = rngFor(state.meta.seed, 'copa', year);
   let stage = COPAS[year].realStage;
   if (state.meta.universe === 'fictional' || stage === 0) stage = rng.weighted([3, 4, 5, 6, 7], (s) => (s === 3 ? 2 : s === 4 ? 3 : s === 5 ? 2 : 1.2)) ?? 4;
