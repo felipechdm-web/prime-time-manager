@@ -130,6 +130,16 @@ export function ControlRoom({ gameId, state }: { gameId: string; state: GameStat
                 <div className="text-xs uppercase tracking-wide text-muted">{data.moment.reason}</div>
                 <div className="font-display text-lg font-black">{s.title}</div>
               </div>
+              {s.match && (() => {
+                // placar ao vivo: o último lance até o minuto atual (lances calculados pelo motor)
+                const sc = s.match.plays.filter((p) => p.minute <= minute).at(-1)?.score ?? [0, 0];
+                return (
+                  <div className="rounded-theme bg-surface-3 px-3 py-1.5 text-center">
+                    <div className="text-[10px] uppercase tracking-wide text-muted">{s.match.competition} · {s.match.phase}</div>
+                    <div className="font-display text-lg font-black tabular">{s.match.home} {sc[0]} x {sc[1]} {s.match.away}</div>
+                  </div>
+                );
+              })()}
               <div className="text-right">
                 <div className="tabular font-display text-3xl font-black text-accent">{now?.clock}</div>
                 <div className="text-xs text-muted">minuto {minute + 1} de {total} {!finished && !paused && pendingDecision < 0 && <span className="blink text-bad">● AO VIVO</span>}</div>
@@ -143,6 +153,9 @@ export function ControlRoom({ gameId, state }: { gameId: string; state: GameStat
                   <YAxis stroke="var(--muted)" fontSize={10} />
                   <Tooltip contentStyle={{ background: 'var(--surface-3)', border: '1px solid var(--border)', borderRadius: 8 }} formatter={(v, k) => [fmtPts(Number(v)), s.stations.find((x) => x.id === String(k))?.name ?? String(k)]} />
                   {s.breaks.map((b) => <ReferenceLine key={b} x={s.minutes[b]?.clock} stroke="var(--muted)" strokeDasharray="2 4" />)}
+                  {s.match?.plays.filter((p) => p.minute <= minute && (p.kind === 'gol' || p.kind === 'gol_penalti' || p.kind === 'penaltis')).map((p, i) => (
+                    <ReferenceLine key={`g${i}`} x={s.minutes[p.minute]?.clock} stroke="var(--good)" strokeDasharray="1 3" label={{ value: '⚽', position: 'top', fontSize: 12 }} />
+                  ))}
                   {s.stations.map((st) => (
                     <Line key={st.id} type="monotone" dataKey={st.id} stroke={st.color} strokeWidth={st.id === s.playerStationId ? 3.5 : 1.5} dot={false} isAnimationActive={false} />
                   ))}

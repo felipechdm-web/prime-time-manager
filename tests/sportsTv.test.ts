@@ -9,7 +9,7 @@ import { applyIntent } from '../supabase/functions/_shared/engine/intents.ts';
 import { newGame } from '../supabase/functions/_shared/engine/newGame.ts';
 import { dayPlanWithOverlays, slotArray } from '../supabase/functions/_shared/engine/schedule.ts';
 import { simulate } from '../supabase/functions/_shared/engine/sim.ts';
-import { advanceSports, competitionOf, fixtureByCode, programMarketInterest } from '../supabase/functions/_shared/engine/sports.ts';
+import { advanceSports, competitionOf, fixtureByCode, matchInterest, programMarketInterest } from '../supabase/functions/_shared/engine/sports.ts';
 import { assignBroadcasts, decisiveBroadcast, sportsDayPlan, sportsProgramIds, sublicenseQuote } from '../supabase/functions/_shared/engine/sportsTv.ts';
 import type { CatalogSnapshot, GameState } from '../supabase/functions/_shared/engine/types.ts';
 import { buildLote1, buildLote3, buildLote5 } from '../supabase/seeds/build.ts';
@@ -152,9 +152,15 @@ test('estaduais só passam na praça deles (Carioca no Rio, Mineiro em BH, no me
   assert.ok(Number.isFinite(mi.markets[at('RJ')]) && mi.markets[at('RJ')] > 0.5);
   assert.ok(Number.isNaN(mi.markets[at('SP')]), 'em SP a Globo mostra a grade normal');
   assert.equal(fixtureByCode(s, w.byMarket[at('RJ')])!.comp, 'carioca');
-  // todo estadual da Globo da semana está em alguma transmissão
-  const comps = new Set(s.sports!.windows!.filter((x) => x.station === globo).flatMap((x) => x.byMarket.filter(Boolean).map((code) => fixtureByCode(s, code)!.comp)));
-  for (const c of ['carioca', 'mineiro', 'gauchao']) assert.ok(comps.has(c), `${c} passa na semana da largada`);
+  // estaduais da Globo na semana: Carioca no Rio e Gaúcho em Porto Alegre; jogo fraco de estadual não toma o lugar
+  // da grade normal da praça (o Mineiro só entra se houver jogo bom no horário)
+  const gw = s.sports!.windows!.filter((x) => x.station === globo);
+  const comps = new Set(gw.flatMap((x) => x.byMarket.filter(Boolean).map((code) => fixtureByCode(s, code)!.comp)));
+  for (const c of ['carioca', 'gauchao']) assert.ok(comps.has(c), `${c} passa na semana da largada`);
+  for (const x of gw) x.byMarket.forEach((code, i) => {
+    const f = code ? fixtureByCode(s, code)! : null;
+    if (f && ['carioca', 'mineiro', 'gauchao', 'paulistao'].includes(f.comp)) assert.ok(matchInterest(s, f, i) >= 0.35, `${code} fraco demais em ${MARKETS[i].code}`);
+  });
 });
 
 test('cotas esportivas vendidas na temporada, jogos exibidos contam para a obrigação do contrato', () => {

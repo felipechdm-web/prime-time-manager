@@ -13,7 +13,7 @@ pelos anos seguintes. Joga-se no navegador, no PC e no celular.
 
 | Camada | Onde | O que faz |
 |---|---|---|
-| Motor | `supabase/functions/_shared/engine/` | TypeScript puro e determinístico (semente por partida). Audiência por faixa de 15 min em 15 praças (PNT), 7 segmentos de público, herança, hábito, buzz, fadiga, fuga para o digital; comercial (CPP, ocupação, descontos, cotas, merchandising, arrendamento); rivais com arquétipos; baralho de 77 eventos com arcos; KPIs, fechamentos e carreira. |
+| Motor | `supabase/functions/_shared/engine/` | TypeScript puro e determinístico (semente por partida). Audiência por faixa de 15 min em 15 praças (PNT), 7 segmentos de público, herança, hábito, buzz, fadiga, fuga para o digital; comercial (CPP, ocupação, descontos, cotas, merchandising, arrendamento); rivais com arquétipos; baralho de 87 eventos com arcos (10 deles do esporte real); KPIs, fechamentos e carreira. |
 | Mestre | `supabase/functions/_shared/game/` | Chama a Claude API (saída estruturada em JSON, validada com Zod e com uma tentativa de correção). Remove frases com números inventados, limita efeitos propostos (humor ±15, confiança ±10, buzz ±10, reputação ±3) e trata o texto livre do jogador como dado. Sem chave ou sem crédito, usa textos padrão e o jogo continua. |
 | Funções | `supabase/functions/<nome>/` | 13 Edge Functions (Deno): `create-game`, `apply-intent`, `simulate-week`, `mestre-scene`, `resolve-event`, `live-mode`, `interpret-free-action`, `catalog-admin` (Editor de Catálogo) e as da Mesa de Negociação: `catalog-browse`, `negotiation-open`, `negotiation-turn`, `negotiation-close` e `tender-resolve` (só estrutura até a Fase 6.4). Conferem o login, carregam o estado, rodam o motor, gravam com trava de versão e devolvem só o que mudou. |
 | Banco | `supabase/setup_completo.sql` | Postgres com RLS: cada jogador só lê as próprias partidas; o site só **lê** as tabelas do jogo e toda escrita passa pelas funções. |
@@ -103,6 +103,12 @@ prime-time-manager/
   pênaltis estouram a grade (evento com escolha: atrasar ou cortar o pós-jogo); obrigação de exibir 80% dos jogos
   escolhidos; cotas esportivas por temporada; sublicenciamento das janelas de TV paga e streaming, uma vez por
   contrato. O "Campeonato Nacional" genérico, a Copa antiga e o leilão de futebol ficam desligados com o esporte real.
+  Central de Esportes (tela): transmissões da semana com projeção por praça, escolha do jogo de cada rodada (ou
+  abrir mão dele), equipe no estádio ou narração do estúdio, tabelas, próximos jogos e cotas. Modo ao vivo dos jogos:
+  o placar e os lances vêm do motor, gols e pênaltis fazem picos no minuto a minuto, e o Haiku narra só esses lances
+  (sem IA, texto-modelo). Eventos da seção 8C.7 no baralho (seleção eliminada, final, rebaixamento, jogo adiado,
+  mudança de horário, narrador assediado, exclusividade de patrocinador, briga em campo, concorrência). Os jogos são
+  espelhados na tabela `fixtures`.
 - **Modelos (v2, seção 17.5)**: todas as funções usam `claude-haiku-5-5` com esforço baixo e raciocínio desligado;
   cada função tem o seu `max_tokens` (`supabase/functions/_shared/game/llmConfig.ts`). O Sonnet 5.5 fica como
   modo premium desligado (`LLM_PREMIUM=on` liga, só na avaliação com a presidência). Tudo pode ser trocado por

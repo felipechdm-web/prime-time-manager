@@ -101,6 +101,17 @@ export function liveFallback(state: GameState, title: string, series: { m: numbe
   return out.sort((a, b) => a.minute - b.minute);
 }
 
+// narração sem IA de um jogo do esporte real: só os lances calculados pelo motor (sem nomes de jogadores)
+export function sportsLiveFallback(match: { home: string; away: string; competition: string; phase: string; score: number[]; plays: { minute: number; text: string; score: [number, number] }[] }, total: number): { minute: number; text: string }[] {
+  const out: { minute: number; text: string }[] = [{ minute: 0, text: `Bola rolando: ${match.home} x ${match.away}, ${match.competition} (${match.phase}).` }];
+  const half = match.plays.filter((p) => p.minute <= 45).at(-1)?.score ?? [0, 0];
+  out.push({ minute: 45, text: `Fim do primeiro tempo: ${match.home} ${half[0]} x ${half[1]} ${match.away}. Hora do intervalo comercial.` });
+  for (const p of match.plays) out.push({ minute: p.minute, text: p.text });
+  const [h, a] = match.score;
+  if (h !== undefined && a !== undefined) out.push({ minute: Math.max(0, total - 1), text: `Fim de jogo: ${match.home} ${h} x ${a} ${match.away}.` });
+  return out.sort((x, y) => x.minute - y.minute);
+}
+
 export function stationName(state: GameState, id: string): string {
   return stationById(state, id)?.name ?? id;
 }

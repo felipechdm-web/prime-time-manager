@@ -8,7 +8,8 @@ import { money } from './money.ts';
 import { clamp } from './rng.ts';
 import { blocksFromSlots, cloneWeek, placeBlock, slotArray } from './schedule.ts';
 import { makeContract } from './setup.ts';
-import { sublicenseSport } from './sportsTv.ts';
+import { setSportsCrew, setSportsPick, sublicenseSport } from './sportsTv.ts';
+import { computeLiveMoments } from './live.ts';
 import { getProgram, nextId, npcById, npcByRole, playerStation, pushTimeline } from './state.ts';
 import type { Block, GameState, Program } from './types.ts';
 import { validateSchedule } from './validate.ts';
@@ -37,7 +38,9 @@ export type Intent =
   | { type: 'retire' }
   | { type: 'tutorial'; step: number; done?: boolean }
   | { type: 'ack_alert'; key: string }
-  | { type: 'sublicense_sport'; contractId: string };
+  | { type: 'sublicense_sport'; contractId: string }
+  | { type: 'sports_pick'; contractId: string; unit: string; code: string | null }
+  | { type: 'sports_crew'; contractId: string; crew: 'local' | 'estudio' };
 
 export interface IntentResult {
   ok: boolean;
@@ -385,6 +388,16 @@ export function applyIntent(state: GameState, intent: Intent): IntentResult {
       // revende uma vez as janelas de TV paga e streaming de um direito esportivo (seção 8C.6)
       const r = sublicenseSport(state, String(intent.contractId ?? ''));
       return r.ok ? { ok: true, message: `${r.message} Entrada de ${money(era, r.value ?? 0)} no caixa da semana.` } : fail(r.message);
+    }
+    case 'sports_pick': {
+      // Central de Esportes: trocar o jogo da rodada ou abrir mão da transmissão
+      const r = setSportsPick(state, String(intent.contractId ?? ''), String(intent.unit ?? ''), intent.code ? String(intent.code) : null);
+      if (r.ok) state.liveMoments = computeLiveMoments(state);
+      return r.ok ? { ok: true, message: r.message } : fail(r.message);
+    }
+    case 'sports_crew': {
+      const r = setSportsCrew(state, String(intent.contractId ?? ''), intent.crew === 'estudio' ? 'estudio' : 'local');
+      return r.ok ? { ok: true, message: r.message } : fail(r.message);
     }
   }
   return fail('Intenção desconhecida.');

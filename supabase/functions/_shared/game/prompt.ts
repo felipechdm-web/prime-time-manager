@@ -46,13 +46,14 @@ export const MESTRE_V1_FIXED = `Você é o MESTRE do Prime Time Manager, um simu
 - REUNIÃO: diálogo em turnos com 1 a 3 personagens. Cada fala tem o id do personagem no campo speaker. Reaja ao que o jogador disser. Encerre com um resultado ou um impasse quando for o último turno.
 - EVENTO: apresente a situação e as opções recebidas do motor (não invente opções com efeitos não listados; você pode reescrever o texto das opções, mantendo os mesmos ids).
 - AO VIVO: narração da sala de controle, minuto a minuto, curta e tensa, usando a série de pontos fornecida. Comece cada fala com o minuto no formato "12' ".
+- ESPORTE: narração de jogos e eventos esportivos a partir do placar, dos lances e do minuto a minuto calculados pelo motor. Narre só os lances fornecidos, com os mesmos minutos e placares. Atletas reais não ganham falas, nomes nem fatos inventados fora de campo: jogadores só como "o camisa 9", "o goleiro", "o piloto". O narrador é um personagem fictício da emissora.
 - AVALIAÇÃO: reunião de fechamento com a presidência, baseada nos KPIs fornecidos.
 - NEGOCIAÇÃO: reunião com o representante de um player de direitos. Interprete a fala do jogador como proposta estruturada no campo "offer" (lado "player"). Para responder em nome do player, use SOMENTE a decisão e a contraproposta enviadas pelo motor no envelope da rodada; você escolhe as palavras, nunca os números. Registre argumentos do jogador em "argument_tags" (lista permitida no envelope). Nas cenas de negociação, o formato da resposta vem na tarefa da chamada.
 
 ## Formato da resposta
 Responda SEMPRE com um único objeto JSON válido no esquema:
 {
-  "scene_type": "boletim|mensagem|reuniao|evento|ao_vivo|avaliacao|livre",
+  "scene_type": "boletim|mensagem|reuniao|evento|ao_vivo|esporte|avaliacao|livre",
   "narrative": [ {"speaker": "narrador|<id_do_personagem>", "text": "..."} ],
   "headlines": ["..."],
   "choices": [ {"id": "...", "label": "..."} ],
@@ -111,7 +112,7 @@ ${input.task}`;
 export const MESTRE_JSON_SCHEMA: Record<string, unknown> = {
   type: 'object',
   properties: {
-    scene_type: { type: 'string', enum: ['boletim', 'mensagem', 'reuniao', 'evento', 'ao_vivo', 'avaliacao', 'livre'] },
+    scene_type: { type: 'string', enum: ['boletim', 'mensagem', 'reuniao', 'evento', 'ao_vivo', 'esporte', 'avaliacao', 'livre'] },
     narrative: {
       type: 'array',
       items: {

@@ -84,7 +84,7 @@ export interface MestreNarrative {
 }
 
 export interface MestreOutput {
-  scene_type: 'boletim' | 'mensagem' | 'reuniao' | 'evento' | 'ao_vivo' | 'avaliacao' | 'livre';
+  scene_type: 'boletim' | 'mensagem' | 'reuniao' | 'evento' | 'ao_vivo' | 'esporte' | 'avaliacao' | 'livre';
   narrative: MestreNarrative[];
   headlines: string[];
   choices: { id: string; label: string }[];

@@ -4,14 +4,14 @@
 
 import { GENRES } from './catalog/genres.ts';
 import { MARKET_WEIGHTS, MARKETS } from './catalog/markets.ts';
-import { clamp } from './rng.ts';
+import { clamp, rngFor } from './rng.ts';
 import {
-  competitionOf, fixtureByCode, fixturesBetween, inArea, isTvKickoff, matchInterest, matchProgramId, matchTitle, seasonAt, seasonEndDate, sportsActive, sportsDaysBetween, teamName,
+  competitionOf, fixtureByCode, fixturesBetween, inArea, isTvKickoff, matchEvents, matchInterest, matchProgramId, matchTitle, seasonAt, seasonEndDate, sportsActive, sportsDaysBetween, teamName,
 } from './sports.ts';
 import type { Fixture } from './sports.ts';
 import { activeStations, getProgram, nextId, playerStation, pushTimeline } from './state.ts';
 import { addDays, clockToSlot, SLOTS_PER_DAY } from './time.ts';
-import type { AdDeal, GameState, Program, RightsContract, SportContractInfo, SportsCompetitionSnap, SportsWindow } from './types.ts';
+import type { AdDeal, GameState, Program, RightsContract, SportContractInfo, SportsChange, SportsCompetitionSnap, SportsWindow } from './types.ts';
 
 const PRE_SLOTS = 1; // pré-jogo de 15 min
 const POST_SLOTS = 2; // pós-jogo de 30 min
@@ -20,6 +20,7 @@ const SPORTS_PRICE = 1.3; // tabela do esporte acima da média (as cotas esporti
 const MIN_AIRED = 0.8; // obrigação: exibir ao menos 80% dos jogos escolhidos
 const COTA_SHARE = 0.7; // cotas vendidas na temporada cobrem ~70% do custo dos direitos
 const SUBLICENSE_SHARE = 0.22; // janela de TV paga e streaming vale ~22% do custo anual por ano restante
+const WEAK_LOCAL_GAME = 0.35; // abaixo desse interesse, o jogo de estadual não entra na praça (fica a grade normal)
 
 // ===== custos =====
 // custo de direitos + produção (equipe no local) por jogo exibido, pelo apelo da competição; escala do gênero futebol
@@ -77,6 +78,8 @@ export function createSportsContracts(state: GameState): void {
       aired: 0,
       checkedSeasons: [],
       cotaSeasons: [],
+      crew: 'local',
+      crewRequired: t.exclusividade === 'exclusivo', // quem compra com exclusividade se compromete com equipe própria no local
     };
     const cedente = typeof t.cedente === 'string' && cat.holders.some((h) => h.id === t.cedente) ? t.cedente : comp.holderId;
     const pacote = info.pacote ? ` (pacote ${info.pacote === 'libra' ? 'Libra' : info.pacote.toUpperCase()})` : '';
@@ -166,21 +169,29 @@ export function sportsProgramIds(stationId: string, main: string): { match: stri
 // escolha da semana (seção 8C, recomendação aprovada): quem tem 1ª escolha escolhe antes; os rivais e o jogador
 // (automático, até a Central de Esportes) levam os jogos de maior interesse; transmissão regionalizada escolhe o
 // horário com mais torcida somada e mostra em cada praça o jogo de lá
-export function assignBroadcasts(state: GameState): SportsWindow[] {
+export function assignBroadcasts(state: GameState, opts: { recompute?: boolean } = {}): SportsWindow[] {
   const ss = state.sports;
   if (!ss || !sportsActive(state)) return [];
   const week = state.meta.weekIndex;
-  if (ss.windowsWeek === week && ss.windows) return ss.windows;
-  pruneOldSportsPrograms(state);
+  if (ss.windowsWeek === week && ss.windows && !opts.recompute) return ss.windows;
+  if (!opts.recompute) pruneOldSportsPrograms(state);
   const monday = state.meta.date;
   const sunday = addDays(monday, 6);
+  // recálculo (escolha na Central): os dias que já foram ao ar ficam como estão
+  const today = addDays(monday, state.weekProgress.day);
+  const kept = opts.recompute && ss.windowsWeek === week ? (ss.windows ?? []).filter((w) => w.date < today) : [];
+  const ps = playerStation(state);
   const fixtures = fixturesBetween(state, monday, addDays(sunday, 1)).filter((f) => {
     const d = tvSlot(f).date;
-    return d >= monday && d <= sunday;
+    return d >= (kept.length || opts.recompute ? today : monday) && d <= sunday;
   });
   const contracts = activeSportContracts(state, monday, sunday).sort((a, b) => a.sport!.choice - b.sport!.choice || Number(b.sport!.exclusive) - Number(a.sport!.exclusive) || a.stationId.localeCompare(b.stationId));
   const taken = new Set<string>();
-  const windows: (SportsWindow & { codes: string[]; len: number })[] = [];
+  const windows: (SportsWindow & { codes: string[]; len: number })[] = kept.map((w) => {
+    const codes = [...new Set([w.main, ...w.byMarket.filter(Boolean)])];
+    for (const code of codes) taken.add(code);
+    return { ...w, codes, len: fixtureByCode(state, w.main)?.slots ?? 8 };
+  });
   const busy = (station: string, date: string, start: number, len: number) => windows.find((w) => w.station === station && w.date === date && start < w.start + w.len + POST_SLOTS && w.start - PRE_SLOTS < start + len);
   for (const c of contracts) {
     const info = c.sport!;
@@ -189,15 +200,29 @@ export function assignBroadcasts(state: GameState): SportsWindow[] {
     const elig = fixtures.filter((f) => eligible(state, c, f, contracts));
     const units = new Map<string, Fixture[]>();
     for (const f of elig) units.set(unitKey(comp, f), [...(units.get(unitKey(comp, f)) ?? []), f]);
-    for (const list of [...units.values()].sort((a, b) => `${a[0].date}${a[0].time}`.localeCompare(`${b[0].date}${b[0].time}`))) {
+    for (const [uk, list] of [...units.entries()].sort((a, b) => `${a[1][0].date}${a[1][0].time}`.localeCompare(`${b[1][0].date}${b[1][0].time}`))) {
+      if (kept.some((w) => w.contract === c.id && w.unit === uk)) continue;
       const groups: Fixture[][] = [];
       let n = info.perRound;
       if (info.includeBrazil) for (const b of list.filter(isBrazil)) { groups.push([b]); n--; }
       let avail = list.filter((f) => !taken.has(f.code) && !isBrazil(f));
+      // escolha do jogador na Central de Esportes: outro jogo da rodada ('' = não transmitir)
+      const override = c.stationId === ps.id ? ss.overrides?.[`${c.id}|${uk}`] : undefined;
+      const forced = override ? avail.find((f) => f.code === override) : undefined;
+      let forcedMain: string | null = null;
+      if (forced && n > 0) {
+        groups.push(info.regional ? avail.filter((f) => tvSlot(f).date === tvSlot(forced).date && tvSlot(f).slot === tvSlot(forced).slot) : [forced]);
+        forcedMain = forced.code;
+        avail = [];
+        n--;
+      }
       // direito só de algumas praças (estaduais): se a emissora já tem jogo noutra praça num horário, prefere o mesmo
       // horário, para as duas praças verem cada uma o seu jogo na mesma transmissão
       if (info.pracas && avail.length) {
-        const same = avail.filter((f) => windows.some((w) => w.station === c.stationId && w.date === tvSlot(f).date && w.start === tvSlot(f).slot));
+        const local = (f: Fixture) => Math.max(...MARKETS.map((m, i) => (info.pracas!.includes(m.code) && inArea(state, f, i) ? matchInterest(state, f, i) : 0)));
+        const best = Math.max(...avail.map(local));
+        // só junta se o jogo do mesmo horário for quase tão bom quanto o melhor da rodada
+        const same = avail.filter((f) => windows.some((w) => w.station === c.stationId && w.date === tvSlot(f).date && w.start === tvSlot(f).slot) && local(f) >= 0.75 * best);
         if (same.length) avail = same;
       }
       if (n > 0 && avail.length) {
@@ -214,13 +239,16 @@ export function assignBroadcasts(state: GameState): SportsWindow[] {
         }
       }
       for (const g of groups) {
-        const main = [...g].sort((a, b) => nationalInterest(state, b) - nationalInterest(state, a) || a.code.localeCompare(b.code))[0];
+        const main = (forcedMain ? g.find((f) => f.code === forcedMain) : null) ?? [...g].sort((a, b) => nationalInterest(state, b) - nationalInterest(state, a) || a.code.localeCompare(b.code))[0];
         const { date, slot } = tvSlot(main);
         const len = main.slots;
         const clash = busy(c.stationId, date, slot, len);
         // jogo de cada praça: o de maior interesse entre os que passam nela; vazio onde nenhum passa (grade normal)
-        const reaches = (f: Fixture, i: number) => inArea(state, f, i) && (!info.pracas || info.pracas.includes(MARKETS[i].code));
+        // jogo muito fraco numa praça de estadual não vale a troca: ali a emissora segue a grade normal
+        // (a escolha do próprio jogador vale mesmo assim)
+        const reaches = (f: Fixture, i: number) => inArea(state, f, i) && (!info.pracas || (info.pracas.includes(MARKETS[i].code) && (f.code === forcedMain || matchInterest(state, f, i) >= WEAK_LOCAL_GAME)));
         const byMarket = MARKETS.map((_, i) => [...g].filter((f) => reaches(f, i)).sort((a, b) => matchInterest(state, b, i) - matchInterest(state, a, i) || a.code.localeCompare(b.code))[0]?.code ?? '');
+        if (!byMarket.some(Boolean)) continue; // nenhuma praça vale a transmissão
         if (clash) {
           // mesma emissora, mesmo horário (ex.: pacotes Libra e LFU da Globo, Carioca no Rio e Mineiro em BH): junta,
           // cada praça fica com o jogo de maior interesse que passa nela
@@ -228,18 +256,112 @@ export function assignBroadcasts(state: GameState): SportsWindow[] {
           clash.codes.push(...g.map((f) => f.code));
           clash.byMarket = MARKETS.map((_, i) => [clash.byMarket[i], byMarket[i]].filter(Boolean).sort((a, b) => matchInterest(state, fixtureByCode(state, b)!, i) - matchInterest(state, fixtureByCode(state, a)!, i))[0] ?? '');
         } else {
-          windows.push({ station: c.stationId, contract: c.id, date, day: sportsDaysBetween(monday, date), start: slot, main: main.code, byMarket, codes: g.map((f) => f.code), len });
+          windows.push({ station: c.stationId, contract: c.id, date, day: sportsDaysBetween(monday, date), start: slot, main: main.code, byMarket, codes: g.map((f) => f.code), len, unit: uk, ...(override === '' ? { skipped: true } : {}) });
         }
         for (const f of g) taken.add(f.code);
-        info.entitled += 1;
       }
     }
   }
-  ss.windows = windows.map((w) => ({ station: w.station, contract: w.contract, date: w.date, day: w.day, start: w.start, main: w.main, byMarket: w.byMarket }));
+  ss.windows = windows.map((w) => ({ station: w.station, contract: w.contract, date: w.date, day: w.day, start: w.start, main: w.main, byMarket: w.byMarket, ...(w.unit ? { unit: w.unit } : {}), ...(w.skipped ? { skipped: true } : {}) }));
   ss.windowsWeek = week;
-  for (const w of windows) for (const code of w.codes) ss.picks[code] = [...new Set([...(ss.picks[code] ?? []), w.station])];
+  if (opts.recompute) {
+    // escolhas desfeitas: os jogos que deixaram de ser transmitidos saem da lista de quem transmite
+    for (const code of Object.keys(ss.picks)) {
+      const f = fixtureByCode(state, code);
+      if (f && tvSlot(f).date >= today && tvSlot(f).date <= sunday) delete ss.picks[code];
+    }
+  }
+  for (const w of windows) if (!w.skipped) for (const code of w.codes) ss.picks[code] = [...new Set([...(ss.picks[code] ?? []), w.station])];
   for (const w of ss.windows) ensureWindowPrograms(state, w);
+  if (opts.recompute) {
+    // programas de transmissões trocadas (ainda não exibidos) saem do estado
+    const valid = new Set(ss.windows.flatMap((w) => Object.values(sportsProgramIds(w.station, w.main))));
+    state.programs = state.programs.filter((p) => !(p.origin === 'sports' && typeof p.flags.fixture === 'string' && p.createdWeek === week && p.totals.airings === 0 && !valid.has(p.id)));
+  }
   return ss.windows;
+}
+
+// ===== Central de Esportes: escolha dos jogos e equipe =====
+export interface PickOption { code: string; title: string; date: string; time: string; projected: number }
+export interface PickUnit { contractId: string; contractLabel: string; unit: string; label: string; chosen: string | null; skipped: boolean; locked: boolean; options: PickOption[] }
+
+// rodadas desta semana em que o jogador escolhe: o jogo escolhido, as alternativas livres e se o dia já passou
+export function playerPickUnits(state: GameState): PickUnit[] {
+  const ss = state.sports;
+  if (!ss?.windows) return [];
+  const ps = playerStation(state);
+  const monday = state.meta.date;
+  const today = addDays(monday, state.weekProgress.day);
+  const all = activeSportContracts(state, monday, addDays(monday, 6));
+  const fixtures = fixturesBetween(state, monday, addDays(monday, 7)).filter((f) => tvSlot(f).date >= monday && tvSlot(f).date <= addDays(monday, 6));
+  const takenByOthers = new Set(ss.windows.filter((w) => w.station !== ps.id).flatMap((w) => w.byMarket.filter(Boolean).concat(w.main)));
+  const out: PickUnit[] = [];
+  for (const c of all.filter((x) => x.stationId === ps.id)) {
+    const comp = competitionOf(state, c.sport!.comp);
+    if (!comp) continue;
+    const mine = ss.windows.filter((w) => w.contract === c.id);
+    const units = new Map<string, Fixture[]>();
+    for (const f of fixtures.filter((f) => eligible(state, c, f, all))) units.set(unitKey(comp, f), [...(units.get(unitKey(comp, f)) ?? []), f]);
+    // interesse nas praças que recebem o jogo (estaduais e contratos regionais não contam o resto do país)
+    const reachInterest = (f: Fixture) => {
+      let s = 0;
+      let wsum = 0;
+      MARKETS.forEach((m, i) => {
+        if (!inArea(state, f, i) || (c.sport!.pracas && !c.sport!.pracas.includes(m.code))) return;
+        s += matchInterest(state, f, i) * MARKET_WEIGHTS[i];
+        wsum += MARKET_WEIGHTS[i];
+      });
+      return wsum ? s / wsum : 0;
+    };
+    for (const [uk, list] of units) {
+      const codes = new Set(list.map((f) => f.code));
+      // a rodada pode estar numa transmissão de outro contrato (ex.: Mineiro em BH junto com o Carioca no Rio)
+      const w = mine.find((x) => x.unit === uk) ?? ss.windows.find((x) => x.station === ps.id && x.byMarket.some((code) => codes.has(code)));
+      const first = [...list].sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`))[0];
+      const locked = tvSlot(first).date < today || (!!w && w.date < today);
+      const label = comp.kind === 'evento' ? `${comp.name} · ${first.date.slice(8)}/${first.date.slice(5, 7)}` : `${comp.name} · ${first.phaseName}${first.away && !first.tie ? ` ${first.round}` : ''}`;
+      const chosen = w ? (codes.has(w.main) ? w.main : w.byMarket.find((code) => codes.has(code)) ?? w.main) : null;
+      out.push({
+        contractId: c.id, contractLabel: c.label, unit: uk, label, chosen, skipped: !!w?.skipped, locked,
+        options: list.filter((f) => !takenByOthers.has(f.code) && tvSlot(f).date >= today).map((f) => ({ code: f.code, title: matchTitle(state, f), date: f.date, time: f.time, projected: Math.round(reachInterest(f) * 100) / 100 })).sort((a, b) => b.projected - a.projected),
+      });
+    }
+  }
+  return out.sort((a, b) => a.label.localeCompare(b.label));
+}
+
+// o jogador troca o jogo de uma rodada ou abre mão da transmissão (code = null)
+export function setSportsPick(state: GameState, contractId: string, unit: string, code: string | null): { ok: boolean; message: string } {
+  const u = playerPickUnits(state).find((x) => x.contractId === contractId && x.unit === unit);
+  if (!u) return { ok: false, message: 'Essa rodada não é sua nesta semana.' };
+  if (u.locked) return { ok: false, message: 'Esse jogo já foi ao ar.' };
+  if (code && !u.options.some((o) => o.code === code)) return { ok: false, message: 'Esse jogo não está disponível para a sua emissora.' };
+  const ss = state.sports!;
+  const key = `${contractId}|${unit}`;
+  const previous = ss.overrides?.[key];
+  ss.overrides = { ...(ss.overrides ?? {}), [key]: code ?? '' };
+  assignBroadcasts(state, { recompute: true });
+  const title = code ? matchTitle(state, fixtureByCode(state, code)!) : '';
+  if (code && !ss.windows!.some((w) => w.station === playerStation(state).id && !w.skipped && (w.main === code || w.byMarket.includes(code)))) {
+    // o horário bate com outra transmissão da emissora: desfaz e explica
+    const next = { ...ss.overrides };
+    if (previous === undefined) delete next[key];
+    else next[key] = previous;
+    ss.overrides = next;
+    assignBroadcasts(state, { recompute: true });
+    return { ok: false, message: `${title} bate com outra transmissão sua no mesmo horário. Troque aquela transmissão antes.` };
+  }
+  return { ok: true, message: code ? `Transmissão escolhida: ${title}.` : `Você abriu mão da transmissão de ${u.label}. Conta na obrigação mínima do contrato.` };
+}
+
+// equipe no estádio (padrão) ou narração do estúdio: mais barata e com menos qualidade de transmissão
+export function setSportsCrew(state: GameState, contractId: string, crew: 'local' | 'estudio'): { ok: boolean; message: string } {
+  const ps = playerStation(state);
+  const c = state.rightsContracts?.find((x) => x.id === contractId);
+  if (!c?.sport || c.stationId !== ps.id) return { ok: false, message: 'Esse direito esportivo não é da sua emissora.' };
+  if (crew === 'estudio' && c.sport.crewRequired) return { ok: false, message: 'O contrato exige equipe própria no local do jogo.' };
+  c.sport.crew = crew;
+  return { ok: true, message: crew === 'local' ? `${c.label}: equipe completa no estádio.` : `${c.label}: narração do estúdio a partir da próxima transmissão.` };
 }
 
 // programas da transmissão: jogo, pré-jogo e pós-jogo (os dois últimos herdam público do jogo, mesmo grupo esporte)
@@ -250,14 +372,18 @@ function ensureWindowPrograms(state: GameState, w: SportsWindow): void {
   const comp = competitionOf(state, f.comp);
   const regional = new Set(w.byMarket).size > 1;
   const title = regional ? `${comp?.name ?? 'Futebol'}: jogo da sua praça` : matchTitle(state, f);
-  const cost = comp ? matchCost(comp) : 1_000_000;
+  // equipe: narração do estúdio custa 35% menos e perde qualidade; sem o narrador da casa (evento), também perde
+  const crew = state.rightsContracts?.find((c) => c.id === w.contract)?.sport?.crew ?? 'local';
+  const narratorGone = typeof state.flags.narrador_saiu === 'number' && state.meta.weekIndex - Number(state.flags.narrador_saiu) < 26;
+  const quality = 80 - (crew === 'estudio' ? 12 : 0) - (narratorGone ? 6 : 0);
+  const cost = Math.round((comp ? matchCost(comp) : 1_000_000) * (crew === 'estudio' ? 0.65 : 1));
   const nat = MARKETS.reduce((s, _, i) => s + (w.byMarket[i] ? matchInterest(state, fixtureByCode(state, w.byMarket[i]) ?? f, i) : 0.6) * MARKET_WEIGHTS[i], 0);
   const make = (id: string, genre: 'futebol' | 'mesa_redonda', ttl: string, role: string | null, slots: number, costPerEp: number) => {
     let p = getProgram(state, id);
     if (p) return p;
     const g = GENRES[genre];
     p = {
-      id, stationId: w.station, title: ttl, genre, origin: 'sports', quality: genre === 'futebol' ? 80 : 55, appeal: clamp(Math.round(nat * (role ? 40 : 70)), 8, 99),
+      id, stationId: w.station, title: ttl, genre, origin: 'sports', quality: genre === 'futebol' ? quality : 55, appeal: clamp(Math.round(nat * (role ? 40 : 70)), 8, 99),
       profile: { ...g.profile }, rating: 'L', costPerEp, durStd: slots * 15, durMin: slots * 15, durMax: (slots + 3) * 15, fatigue: 0, buzz: genre === 'futebol' ? 40 : 15,
       habitWeeks: 8, habitKey: '', movesRecent: [], status: 'on_air', talentIds: [], commercial: genre === 'futebol' ? 100 : 70,
       episodes: { total: null, aired: 0, planned: null }, isRerun: false, merchLevel: 0, promo: 0, locked: true, leaseWeeklyPerHour: 0, rights: null,
@@ -299,7 +425,7 @@ export interface SportsDayPlan {
 // estava ali e os seguintes vão inteiros para depois do jogo; o que passar das 6h sai do dia
 export function sportsDayPlan(state: GameState, stationId: string, day: number, slots: (string | null)[]): SportsDayPlan {
   const date = addDays(state.meta.date, day);
-  const ws = (state.sports?.windowsWeek === state.meta.weekIndex ? state.sports.windows ?? [] : []).filter((w) => w.station === stationId && w.date === date).sort((a, b) => a.start - b.start);
+  const ws = (state.sports?.windowsWeek === state.meta.weekIndex ? state.sports.windows ?? [] : []).filter((w) => w.station === stationId && w.date === date && !w.skipped).sort((a, b) => a.start - b.start);
   if (!ws.length) return { slots, displaced: [], overtime: [] };
   let cur = slots.slice();
   const displaced = new Set<string>();
@@ -403,7 +529,7 @@ export function sportsOverlayBlocks(state: GameState, stationId: string, day: nu
 // jogo decisivo do jogador nesta semana (pode ir para a prorrogação ou pênaltis): dispara o evento com escolha
 export function decisiveBroadcast(state: GameState): { title: string } | null {
   const ps = playerStation(state);
-  const w = (state.sports?.windows ?? []).find((x) => x.station === ps.id && fixtureByCode(state, x.main)?.tie && fixtureByCode(state, x.main)?.leg !== 1);
+  const w = (state.sports?.windows ?? []).find((x) => x.station === ps.id && !x.skipped && fixtureByCode(state, x.main)?.tie && fixtureByCode(state, x.main)?.leg !== 1);
   const f = w ? fixtureByCode(state, w.main) : null;
   return f ? { title: matchTitle(state, f) } : null;
 }
@@ -465,9 +591,13 @@ export function closeSportsWeek(state: GameState): { notes: string[]; fines: num
   const ps = playerStation(state);
   for (const w of ss.windows) {
     const c = state.rightsContracts?.find((x) => x.id === w.contract);
-    if (c?.sport) c.sport.aired += 1;
-    if (w.station !== ps.id) continue;
+    if (c?.sport) {
+      c.sport.entitled += 1;
+      if (!w.skipped) c.sport.aired += 1;
+    }
+    if (w.station !== ps.id || w.skipped) continue;
     const f = fixtureByCode(state, w.main);
+    if (f?.score && matchEvents(state, f).some((e) => e.kind === 'expulsao')) ss.lastRedCard = matchTitle(state, f); // pode virar caso de imagem
     if (!f?.score || f.score.length < 4) continue;
     const pens = f.score[2] >= 0;
     if (f.score[4] !== 1 && !pens) continue;
@@ -509,6 +639,92 @@ export function weekDisplacements(state: GameState, stationId: string, dayPlans:
   return out;
 }
 export const HABIT_LOSS_PER_DISPLACEMENT = HABIT_LOSS;
+
+// ===== eventos esportivos (seção 8C.7) =====
+const BIG_CLUBS = ['flamengo', 'corinthians', 'sao_paulo', 'palmeiras', 'vasco', 'gremio', 'atletico_mg', 'cruzeiro', 'internacional', 'santos'];
+const NARRATORS = ['Heitor Camargo', 'Augusto Brandão', 'Rogério Valente', 'Otávio Lemos']; // personagens fictícios
+export interface SportsEventCall { templateId: string; vars: Record<string, string | number> }
+
+// o que aconteceu no esporte e afeta o jogador nesta semana vira evento do baralho (no máximo dois por semana)
+export function sportsEventCandidates(state: GameState, changes: { fixture: Fixture; change: SportsChange }[]): SportsEventCall[] {
+  const ss = state.sports;
+  if (!ss || !sportsActive(state)) return [];
+  const ps = playerStation(state);
+  const week = state.meta.weekIndex;
+  const date = state.meta.date;
+  const flags = (ss.eventFlags ??= {});
+  const fresh = (key: string, cooldown = 9999) => flags[key] === undefined || week - flags[key] >= cooldown;
+  const mark = (key: string) => { flags[key] = week; };
+  const all = activeSportContracts(state, date, addDays(date, 6));
+  const mine = all.filter((c) => c.stationId === ps.id);
+  const hasComp = (comp: string) => mine.some((c) => c.sport!.comp === comp);
+  const out: (SportsEventCall & { key: string })[] = [];
+  const rng = rngFor(state.meta.seed, 'eventos_esporte', week);
+  // concorrência aberta (vale para qualquer emissora, até a fictícia)
+  for (const comp of state.catalog!.sports!.competitions) {
+    for (const t of (comp.calendar.concorrencias as { ciclo: string; abre: string; decide_ate: string }[] | undefined) ?? []) {
+      const key = `leilao_${comp.id}_${t.ciclo}`;
+      if (t.abre <= date && date <= t.decide_ate && fresh(key)) {
+        out.push({ key, templateId: 'esporte_leilao_prazo', vars: { competicao: comp.name, ciclo: t.ciclo, prazo: `${t.decide_ate.slice(8)}/${t.decide_ate.slice(5, 7)}/${t.decide_ate.slice(0, 4)}` } });
+      }
+    }
+  }
+  // seleção eliminada (só pesa para quem tem a Copa)
+  if (hasComp('copa_do_mundo')) {
+    const lost = fixturesBetween(state, addDays(date, -10), addDays(date, -1)).find((f) => f.comp === 'copa_do_mundo' && f.tie && f.score && (f.home === 'selecao:brasil' || f.away === 'selecao:brasil') && koLoser(f) === 'selecao:brasil');
+    if (lost && fresh(`selecao_${lost.season}`)) {
+      out.push({ key: `selecao_${lost.season}`, templateId: 'esporte_selecao_eliminada', vars: { fase: lost.phaseName.toLowerCase() } });
+    }
+  }
+  // clube de grande torcida rebaixado (para quem tem o Brasileirão)
+  if (hasComp('brasileirao_a')) {
+    for (const y of [Number(date.slice(0, 4)) - 1, Number(date.slice(0, 4))]) {
+      const t = ss.done[`brasileirao_a|${y}`]?.table;
+      const fallen = t?.slice(-4).find((x) => BIG_CLUBS.includes(x));
+      if (fallen && fresh(`rebaixado_${y}`)) {
+        out.push({ key: `rebaixado_${y}`, templateId: 'esporte_clube_rebaixado', vars: { clube: teamName(state, fallen) } });
+      }
+    }
+  }
+  // final com time de grande torcida transmitida pelo jogador
+  for (const w of (ss.windows ?? []).filter((x) => x.station === ps.id && !x.skipped)) {
+    const f = fixtureByCode(state, w.main);
+    if (f?.phase === 'final' && [f.home, f.away].some((x) => BIG_CLUBS.includes(x ?? '')) && fresh(`final_${f.code}`)) {
+      out.push({ key: `final_${f.code}`, templateId: 'esporte_final_grande_torcida', vars: { jogo: matchTitle(state, f) } });
+    }
+  }
+  // jogo adiado ou com horário mudado pela liga, num jogo que o jogador costuma transmitir (horário de TV aberta)
+  const ch = changes
+    .filter((x) => mine.some((c) => eligible(state, c, x.fixture, all)) && ((ss.picks[x.fixture.code] ?? []).includes(ps.id) || (ss.windows ?? []).some((w) => w.station === ps.id && w.byMarket.includes(x.fixture.code)) || isTvKickoff(state, { ...x.fixture, date: x.change.fromDate, time: x.change.fromTime })))
+    .sort((a, b) => Number(b.change.kind === 'adiado') - Number(a.change.kind === 'adiado'))[0];
+  if (ch && fresh(`mudanca_${ch.fixture.code}`)) {
+    out.push({ key: `mudanca_${ch.fixture.code}`, templateId: ch.change.kind === 'adiado' ? 'esporte_jogo_adiado' : 'esporte_mudanca_horario', vars: { jogo: matchTitle(state, ch.fixture), motivo: ch.change.reason } });
+  }
+  // briga em campo num jogo que o jogador transmitiu na semana passada
+  if (ss.lastRedCard && fresh('briga', 8) && rng.chance(0.5)) {
+    out.push({ key: 'briga', templateId: 'esporte_briga_em_campo', vars: { jogo: ss.lastRedCard } });
+  }
+  delete ss.lastRedCard;
+  // narrador da casa assediado e patrocinador pedindo exclusividade: acontecem de vez em quando com quem tem esporte
+  if (mine.length && fresh('narrador', 52) && rng.chance(1 / 40)) {
+    out.push({ key: 'narrador', templateId: 'esporte_narrador_assediado', vars: { narrador: NARRATORS[week % NARRATORS.length] } });
+  }
+  if (state.deals.some((d) => d.contractId && d.status === 'active') && fresh('exclusividade', 39) && rng.chance(1 / 30)) {
+    out.push({ key: 'exclusividade', templateId: 'esporte_patrocinador_exclusividade', vars: {} });
+  }
+  const chosen = out.slice(0, 2);
+  for (const c of chosen) mark(c.key);
+  return chosen.map(({ templateId, vars }) => ({ templateId, vars }));
+}
+
+function koLoser(f: Fixture): string | null {
+  if (!f.score || !f.away) return null;
+  const [h, a, ph, pa] = f.score;
+  if (f.leg === 1) return null;
+  if (h !== a) return h > a ? f.away : f.home;
+  if (ph !== undefined && ph >= 0) return ph > pa ? f.away : f.home;
+  return null;
+}
 
 // ===== sublicenciamento (seção 8C.6) =====
 export function sublicenseQuote(state: GameState, contractId: string): { ok: boolean; value: number; reason: string } {

@@ -8,7 +8,9 @@ import { applyIntent } from '../engine/intents.ts';
 import type { Intent } from '../engine/intents.ts';
 import { computeLiveMoments, liveProjection } from '../engine/live.ts';
 import { money } from '../engine/money.ts';
-import { boletimFallback, liveFallback } from '../engine/narrative.ts';
+import { boletimFallback, liveFallback, sportsLiveFallback } from '../engine/narrative.ts';
+import { advanceSports } from '../engine/sports.ts';
+import { syncFixtures } from './fixturesSync.ts';
 import { newGame } from '../engine/newGame.ts';
 import { SCENARIOS } from '../engine/setup.ts';
 import type { NewGameInput } from '../engine/setup.ts';
@@ -18,7 +20,7 @@ import { getProgram, npcById, npcByRole, playerStation, stationById } from '../e
 import type { Background, CatalogSnapshot, Difficulty, EraId, GameState, ScenarioId, Universe, WeekReport } from '../engine/types.ts';
 import { buildCatalogSnapshot } from '../engine/catalogWorld.ts';
 import { syncRights } from './rightsSync.ts';
-import { DAY_NAMES, formatDate } from '../engine/time.ts';
+import { addDays, DAY_NAMES, formatDate } from '../engine/time.ts';
 import { validateSchedule } from '../engine/validate.ts';
 import { biaAnswer, interviewFallback, meetingOpening, meetingReply } from './fallbackScenes.ts';
 import { basePayload, budgetOk, callLLM, runScene } from './mestre.ts';
@@ -252,6 +254,7 @@ export async function createGame(ctx: HandlerCtx, body: Record<string, unknown>)
   await persistOutputs(ctx, id, state, outputs);
   await ctx.store.updateGame(id, { state, version: 2 }, 1);
   await syncRights(ctx, id, state); // exclusividades reais da largada como contratos ativos (seção 8A.6)
+  await syncFixtures(ctx, id, state); // esporte real: próximos jogos na tabela fixtures
   return { gameId: id, interview: scene.output };
 }
 
@@ -296,7 +299,8 @@ export async function simulateHandler(ctx: HandlerCtx, body: Record<string, unkn
       const o = simulate(state, 'week');
       merged.push(o);
       if (state.meta.status !== 'active') break;
-      if (blockingEvents(state).length || state.liveMoments.length || !validateSchedule(state).ok) break;
+      // jogos do esporte real são ao vivo quase toda semana: só os outros momentos param a simulação longa
+      if (blockingEvents(state).length || state.liveMoments.some((m) => !m.sport) || !validateSchedule(state).ok) break;
       if (state.events.some((e) => !e.resolved)) break;
     }
   } else {
@@ -307,6 +311,7 @@ export async function simulateHandler(ctx: HandlerCtx, body: Record<string, unkn
   }
   await saveGame(ctx, row, state);
   if (state.rightsContracts?.length) await syncRights(ctx, row.id, state); // parcelas, multas e vencimentos da semana
+  await syncFixtures(ctx, row.id, state); // esporte real: placares, horários e transmissões
   const summary = { weekClosed: false, reports: [] as { id: string; kind: string; week: number; day: number | null; data: unknown }[], notes: [] as string[], endGame: null as SimOutputs['endGame'], daysSimulated: [] as number[] };
   for (const o of merged) {
     const { reportIds } = await persistOutputs(ctx, row.id, state, o);
@@ -602,13 +607,35 @@ export async function liveModeHandler(ctx: HandlerCtx, body: Record<string, unkn
   const moment = state.liveMoments.find((m) => m.day === day && (!body.programId || m.programId === body.programId)) ?? state.liveMoments.find((m) => m.day === day);
   if (!moment) throw new HttpError(404, 'Não há momento ao vivo neste dia');
   if (day !== state.weekProgress.day) throw new HttpError(400, `A sala de controle abre no dia da transmissão (${DAY_NAMES[day]}). Rode os dias anteriores primeiro.`);
+  const before = snapshot(state);
+  // esporte real: o placar do dia sai do motor antes de a transmissão começar (mesma semente, mesmo resultado)
+  if (state.sports) advanceSports(state, addDays(state.meta.date, day + 1));
   const series = liveProjection(state, moment);
   const leaderId = series.stations.filter((s) => s.id !== series.playerStationId).sort((a, b) => (series.minutes[Math.floor(series.minutes.length / 2)].values[b.id] ?? 0) - (series.minutes[Math.floor(series.minutes.length / 2)].values[a.id] ?? 0))[0]?.id ?? '';
   const compact = series.minutes.filter((m) => m.m % 5 === 0 || m.m === series.minutes.length - 1).map((m) => ({ m: m.m, player: m.values[series.playerStationId], leader: m.values[leaderId] ?? 0 }));
-  const fb = liveFallback(state, series.title, compact);
+  const match = series.match;
+  const fb = match ? sportsLiveFallback(match, series.minutes.length) : liveFallback(state, series.title, compact);
   let commentary = fb;
-  const before = snapshot(state);
-  if (ctx.llm) {
+  if (ctx.llm && match) {
+    // narração do jogo (cena ESPORTE): a IA narra só os lances e o placar calculados pelo motor
+    const scene = await runScene(ctx, {
+      state, gameId: row.id, sceneType: 'esporte', npcIds: ['npc_pesquisa', 'npc_bia'], fn: 'live-mode',
+      payload: basePayload(state, {
+        jogo: { mandante: match.home, visitante: match.away, competicao: match.competition, fase: match.phase, placar_final: match.score.slice(0, 2), penaltis: match.score.length >= 4 && match.score[2] >= 0 ? match.score.slice(2, 4) : null, prorrogacao: match.score[4] === 1 },
+        lances: match.plays.map((p) => ({ minuto: p.minute, tipo: p.kind, placar: p.score, descricao: p.text })),
+        transmissao_regional: match.regional, intervalo_min: 45, duracao_min: series.minutes.length,
+        audiencia: compact.filter((_, i) => i % 3 === 0), emissora_lider: stationById(state, leaderId)?.name,
+      }),
+      history: '',
+      task: 'Narração do jogo AO VIVO: 7 a 10 falas curtas. O narrador (personagem fictício da emissora) narra SÓ os lances fornecidos, na ordem e com os mesmos minutos e placares; inclua a abertura (0\'), o intervalo (45\') e o fim. Caio ou Bia comentam a audiência em uma ou duas falas. Cada fala começa pelo minuto da transmissão no formato "12\' ". Jogadores só como "o camisa 9", "o goleiro" etc.: nenhum nome de atleta, nenhum fato fora de campo, nenhum gol ou lance que não esteja na lista. choices vazio.',
+      fallback: () => ({ scene_type: 'esporte', narrative: fb.map((c) => ({ speaker: 'narrador', text: `${c.minute}' ${c.text}` })), headlines: [], choices: [], player_action: null, proposals: [], memory_notes: [] }),
+    });
+    commentary = scene.output.narrative.map((n) => {
+      const mm = /^(\d{1,3})'\s*/.exec(n.text);
+      return { minute: mm ? Number(mm[1]) : 0, text: (n.speaker !== 'narrador' ? `${npcById(state, n.speaker)?.name.split(' ')[0] ?? ''}: ` : '') + n.text.replace(/^(\d{1,3})'\s*/, '') };
+    }).sort((a, b) => a.minute - b.minute);
+    await saveGame(ctx, row, state);
+  } else if (ctx.llm) {
     const scene = await runScene(ctx, {
       state, gameId: row.id, sceneType: 'ao_vivo', npcIds: ['npc_pesquisa', 'npc_bia'], fn: 'live-mode',
       payload: basePayload(state, { transmissao: series.title, motivo: moment.reason, serie_minuto_a_minuto: compact, intervalos_min: series.breaks, emissora_lider: stationById(state, leaderId)?.name }),

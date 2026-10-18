@@ -8,6 +8,8 @@ import { getProgram, playerStation } from './state.ts';
 import type { GameState, LiveMoment } from './types.ts';
 import { addDays, COPAS, copaMatches, slotClockMinutes, yearOf } from './time.ts';
 import { brazilMaxStage, hasCopaRights, programAirings, copaProgramId } from './schedule.ts';
+import { competitionOf, fixtureByCode, matchEvents, matchTitle, teamName } from './sports.ts';
+import { sportsProgramIds } from './sportsTv.ts';
 
 // curva normalizada (média ~1) para um programa de N minutos
 export function minuteCurve(kind: CurveKind, minutes: number, seed: number): number[] {
@@ -68,6 +70,14 @@ export function computeLiveMoments(state: GameState): LiveMoment[] {
   const week = state.schedules[ps.id];
   const out: LiveMoment[] = [];
   const seen = new Set<string>();
+  // esporte real: cada transmissão do jogador é um momento ao vivo (o jogo vem antes dos outros momentos)
+  const sports: LiveMoment[] = [];
+  for (const w of state.sports?.windowsWeek === state.meta.weekIndex ? state.sports.windows ?? [] : []) {
+    if (w.station !== ps.id || w.skipped) continue;
+    const f = fixtureByCode(state, w.main);
+    if (!f) continue;
+    sports.push({ day: w.day, programId: sportsProgramIds(ps.id, w.main).match, stationId: ps.id, reason: matchTitle(state, f), startSlot: w.start, len: f.slots, done: false, sport: true });
+  }
   // Copa
   for (let d = 0; d < 7; d++) {
     const date = addDays(state.meta.date, d);
@@ -111,7 +121,63 @@ export function computeLiveMoments(state: GameState): LiveMoment[] {
       out.push({ day: 6, programId: p.id, stationId: ps.id, reason: p.genre === 'futebol' ? `Futebol de domingo: "${p.title}"` : `Guerra do domingo: "${p.title}"`, startSlot: sunday.start, len: sunday.len, done: false });
     }
   }
-  return out.sort((a, b) => a.day - b.day).slice(0, 2);
+  const others = out.sort((a, b) => a.day - b.day).slice(0, 2);
+  if (!sports.length) return others;
+  const sportDays = new Set(sports.map((m) => m.day));
+  return [...sports.sort((a, b) => a.day - b.day || a.startSlot - b.startSlot), ...others.filter((m) => !sportDays.has(m.day))].sort((a, b) => a.day - b.day).slice(0, 5);
+}
+
+// ===== jogo ao vivo: lances do motor viram picos no minuto a minuto (seção 8C.4) =====
+export interface LivePlay { minute: number; kind: string; text: string; score: [number, number] }
+export interface LiveMatch { home: string; away: string; competition: string; phase: string; score: number[]; plays: LivePlay[]; regional: boolean }
+
+// minuto do jogo -> minuto da transmissão (15 min de intervalo; 5 min antes da prorrogação)
+function broadcastMinute(x: number): number {
+  if (x <= 45) return x;
+  if (x <= 90) return x + 15;
+  return x + 20;
+}
+
+const PLAY_AMP: Record<string, number> = { gol: 0.08, gol_penalti: 0.08, virada: 0.1, penaltis: 0.18, polemica: 0.04, expulsao: 0.03, penalti_perdido: 0.04, fim_prorrogacao: 0.05 };
+
+function matchLive(state: GameState, programId: string, minutes: number): { curve: number[]; rivalCurve: number[]; match: LiveMatch } | null {
+  const p = getProgram(state, programId);
+  const code = p && !p.flags.sportsRole ? p.flags.fixture : null;
+  const f = typeof code === 'string' ? fixtureByCode(state, code) : null;
+  if (!f || !f.away) return null;
+  const events = f.score ? matchEvents(state, f) : [];
+  const plays: LivePlay[] = [];
+  let h = 0;
+  let a = 0;
+  for (const e of events) {
+    if (e.kind === 'gol' || e.kind === 'gol_penalti') { if (e.team === 'home') h++; else a++; }
+    const m = Math.min(minutes - 1, broadcastMinute(e.minute));
+    plays.push({ minute: m, kind: e.kind, text: e.text, score: [h, a] });
+  }
+  // curva do jogo: abertura, 1º tempo, intervalo, 2º tempo crescendo, prorrogação e pênaltis
+  const rng = rngFor(state.meta.seed, 'curva_jogo', f.code);
+  const base: number[] = [];
+  for (let m = 0; m < minutes; m++) {
+    let v = m < 8 ? 0.85 + m * 0.02 : m < 45 ? 1 : m < 60 ? 0.84 : m < 105 ? 1.02 + 0.06 * ((m - 60) / 45) : 1.12;
+    v *= 1 + rng.normal(0, 0.01);
+    base.push(v);
+  }
+  const boost = new Array(minutes).fill(0);
+  for (const pl of plays) {
+    let amp = PLAY_AMP[pl.kind] ?? 0;
+    if ((pl.kind === 'gol' || pl.kind === 'gol_penalti') && pl.minute >= 95) amp += 0.04; // gol no fim do jogo
+    for (let m = pl.minute; m < minutes; m++) boost[m] += amp * Math.exp(-(m - pl.minute) / 5);
+  }
+  const raw = base.map((v, m) => v * (1 + boost[m]));
+  const mean = raw.reduce((s, x) => s + x, 0) / raw.length;
+  const curve = raw.map((x) => x / mean);
+  const rivalCurve = boost.map((b) => 1 - 0.3 * b); // quando o jogo pega fogo, os rivais perdem um pouco
+  const comp = competitionOf(state, f.comp);
+  const fixtures = typeof p!.flags.fixtures === 'string' ? String(p!.flags.fixtures).split('|').filter(Boolean) : [];
+  return {
+    curve, rivalCurve,
+    match: { home: teamName(state, f.home), away: teamName(state, f.away), competition: comp?.name ?? '', phase: f.phaseName, score: f.score ?? [], plays, regional: new Set(fixtures).size > 1 },
+  };
 }
 
 export interface LiveSeries {
@@ -127,6 +193,7 @@ export interface LiveSeries {
   breaks: number[];
   decisionPoints: { minute: number; options: { id: string; label: string; hint: string }[] }[];
   playerStationId: string;
+  match?: LiveMatch; // jogo do esporte real: placar e lances calculados pelo motor
 }
 
 export const LIVE_OPTIONS = [
@@ -142,12 +209,18 @@ export function liveProjection(state: GameState, moment: LiveMoment): LiveSeries
   const ps = playerStation(state);
   const p = getProgram(state, moment.programId);
   const kind = p ? GENRES[p.genre].curve : 'flat';
-  const minutesTotal = moment.len * 15;
+  // jogo com prorrogação ou pênaltis dura mais do que o previsto no começo da semana
+  const fx = p && typeof p.flags.fixture === 'string' && !p.flags.sportsRole ? fixtureByCode(state, p.flags.fixture) : null;
+  const len = fx ? fx.slots + (fx.score && fx.score.length >= 4 && fx.score[2] >= 0 ? 1 : 0) : moment.len;
+  const minutesTotal = len * 15;
+  const ml = matchLive(state, moment.programId, minutesTotal);
   const stations = res.stationIds.map((sid, c) => {
     const st = state.stations.find((s) => s.id === sid)!;
     const progId = res.slotPrograms[c][moment.startSlot] ?? '';
     const prog = progId ? getProgram(state, progId) : undefined;
-    return { id: sid, name: st.name, color: st.color, program: prog?.title ?? '—', curve: minuteCurve(prog ? GENRES[prog.genre].curve : 'flat', minutesTotal, state.meta.seed + c), c };
+    let curve = minuteCurve(prog ? GENRES[prog.genre].curve : 'flat', minutesTotal, state.meta.seed + c);
+    if (ml) curve = sid === ps.id ? ml.curve : curve.map((v, m) => v * ml.rivalCurve[m]);
+    return { id: sid, name: st.name, color: st.color, program: prog?.title ?? '—', curve, c };
   });
   const minutes: LiveSeries['minutes'] = [];
   for (let m = 0; m < minutesTotal; m++) {
@@ -162,7 +235,7 @@ export function liveProjection(state: GameState, moment: LiveMoment): LiveSeries
     const mm = clockMin % 60;
     minutes.push({ m, clock: `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`, values });
   }
-  const brk = breakMinutes(kind, minutesTotal);
+  const brk = ml ? [45] : breakMinutes(kind, minutesTotal);
   const dps: LiveSeries['decisionPoints'] = [];
   const firstBreak = brk[0] ?? Math.floor(minutesTotal / 3);
   dps.push({ minute: Math.max(2, firstBreak - 2), options: LIVE_OPTIONS.filter((o) => o.id === 'segurar_intervalo' || o.id === 'plantao') });
@@ -174,12 +247,13 @@ export function liveProjection(state: GameState, moment: LiveMoment): LiveSeries
     day: moment.day,
     date: addDays(state.meta.date, moment.day),
     startSlot: moment.startSlot,
-    len: moment.len,
+    len,
     minutes,
     stations: stations.map(({ id, name, color, program }) => ({ id, name, color, program })),
     breaks: brk,
     decisionPoints: dps,
     playerStationId: ps.id,
+    ...(ml ? { match: ml.match } : {}),
   };
 }
 

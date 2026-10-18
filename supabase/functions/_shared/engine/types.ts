@@ -519,6 +519,9 @@ export interface SportsState {
   checkedUntil: string; // até que data as mudanças de calendário já foram sorteadas
   windows?: SportsWindow[]; // transmissões da semana corrente (todas as emissoras)
   windowsWeek?: number;
+  overrides?: Record<string, string>; // escolhas do jogador na Central: "contrato|rodada" -> código do jogo ('' = não transmitir)
+  eventFlags?: Record<string, number>; // eventos esportivos já disparados (chave -> semana)
+  lastRedCard?: string; // jogo transmitido pelo jogador com expulsão na semana que passou
   notes?: string[]; // avisos da semana (prorrogação, horário estourado) para a caixa de entrada
 }
 
@@ -593,6 +596,8 @@ export interface SportContractInfo {
   aired: number; // jogos que foram ao ar
   checkedSeasons: string[]; // temporadas com obrigação já conferida
   cotaSeasons: string[]; // temporadas com cotas de patrocínio já vendidas
+  crew?: 'local' | 'estudio'; // equipe no estádio (padrão) ou narração do estúdio (mais barata, menos qualidade)
+  crewRequired?: boolean; // contrato exige equipe própria no local (seção 8B.2)
 }
 
 // uma transmissão da semana: horário na grade, jogo principal e o jogo de cada praça (transmissão regionalizada)
@@ -604,6 +609,8 @@ export interface SportsWindow {
   start: number; // slot do início do jogo
   main: string; // código do jogo principal
   byMarket: string[]; // código do jogo em cada praça (mesma ordem de MARKETS)
+  unit?: string; // rodada ou fase da escolha (para a Central de Esportes)
+  skipped?: boolean; // o jogador abriu mão da transmissão (conta na obrigação do contrato)
 }
 
 export interface Divergence {
@@ -682,6 +689,7 @@ export interface LiveMoment {
   startSlot: number;
   len: number;
   done: boolean;
+  sport?: boolean; // transmissão esportiva do jogador (Fase 6.4)
 }
 
 export interface WeekProgress {

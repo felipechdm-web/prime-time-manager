@@ -26,14 +26,14 @@ guarda o código, publica as funções no Supabase e hospeda o site (GitHub Page
    as partidas de 2026. O jogo tem só a era atual; partidas antigas de outras eras, se existirem, são apagadas.)
 4. Confira em **Table Editor** (schema `public`). O script cria **37 tabelas** — é normal aparecerem todas:
    - **Catálogo do jogo** (já vêm preenchidas): `eras` (1 linha: a era atual, 2026), `era_rules` (8), `genres` (29),
-     `event_templates` (77), `markets` (15), `station_archetypes` e `npc_archetypes`. Basta conferir essas contagens.
+     `event_templates` (87), `markets` (15), `station_archetypes` e `npc_archetypes`. Basta conferir essas contagens.
    - **Catálogo real** (começam vazias e recebem os lotes de títulos reais): `rights_holders`, `catalog_titles`,
      `schedule_templates`, `historical_rights`, `clubs`, `club_fanbase` e `sports_competitions` (competições esportivas).
    - **Dados das partidas** (começam **vazias** e se enchem quando você joga): `games`, `reports`, `inbox_messages`,
      `conversations`, `messages`, `npc_memories`, `events_log`, `ratings_slots`, `ratings_minute`, `weekly_stats`,
      `finance_ledger`, `competitor_actions`, `kpi_snapshots`, `campaign_summaries`, `player_intents`, `llm_calls`
      (registra o custo de cada chamada à Claude) e `divergences` (quando a partida se afasta da história real, por
-     exemplo ao comprar uma novela que no Brasil passou em outra emissora) e `fixtures` (os jogos e GPs da partida).
+     exemplo ao comprar uma novela que no Brasil passou em outra emissora) e `fixtures` (os jogos e GPs da partida: os da última semana e os das próximas duas, com placar, horário e quem transmite).
    - **Mesa de Negociação** (também começam vazias): `negotiations` (as reuniões), `negotiation_rounds` (cada rodada),
      `rights_contracts` (contratos de direitos), `holder_relationships` (relacionamento com cada player) e
      `negotiation_secrets`, que guarda o preço mínimo secreto de cada player: essa tabela nunca aparece para o jogador,

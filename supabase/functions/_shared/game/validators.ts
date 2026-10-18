@@ -3,7 +3,7 @@
 
 import type { MestreOutput, Validator } from './types.ts';
 
-const SCENES = ['boletim', 'mensagem', 'reuniao', 'evento', 'ao_vivo', 'avaliacao', 'livre'];
+const SCENES = ['boletim', 'mensagem', 'reuniao', 'evento', 'ao_vivo', 'esporte', 'avaliacao', 'livre'];
 
 function isObj(x: unknown): x is Record<string, unknown> {
   return typeof x === 'object' && x !== null && !Array.isArray(x);

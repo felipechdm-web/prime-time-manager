@@ -12,7 +12,7 @@ import { computeLiveMoments } from './live.ts';
 import { devProgress, refreshOffers, resolveAuctions } from './market.ts';
 import { processContracts } from './negotiation.ts';
 import { advanceSports, planCalendarChanges } from './sports.ts';
-import { assignBroadcasts, closeSportsWeek, decisiveBroadcast, HABIT_LOSS_PER_DISPLACEMENT, sellSportsCotas, weekDisplacements } from './sportsTv.ts';
+import { assignBroadcasts, closeSportsWeek, decisiveBroadcast, HABIT_LOSS_PER_DISPLACEMENT, sellSportsCotas, sportsEventCandidates, weekDisplacements } from './sportsTv.ts';
 import { money } from './money.ts';
 import { boletimFallback, dayFallback, evaluationFallback } from './narrative.ts';
 import { buildWeekReport, PA, programResultsFromAcc } from './report.ts';
@@ -794,11 +794,15 @@ export function startWeek(state: GameState, out: SimOutputs, opts: { quiet?: boo
   for (const n of resolveAuctions(state)) inbox(state, { fromNpc: 'npc_comercial', subject: 'Resultado do leilão', body: n, requiresAction: false, eventId: null, kind: 'mensagem' });
   // esporte real (v2): a liga muda horários e adia jogos; cada emissora escolhe os jogos da semana; cotas da temporada
   if (state.sports) {
-    planCalendarChanges(state, state.meta.date);
+    const changes = planCalendarChanges(state, state.meta.date);
     assignBroadcasts(state);
     for (const n of sellSportsCotas(state)) inbox(state, { fromNpc: 'npc_comercial', subject: 'Cotas do esporte', body: n, requiresAction: false, eventId: null, kind: 'mensagem' });
-    const decisive = opts.quiet ? null : decisiveBroadcast(state);
-    if (decisive) fireEvent(state, 'esporte_prorrogacao', {}, { jogo: decisive.title });
+    if (!opts.quiet) {
+      const decisive = decisiveBroadcast(state);
+      if (decisive) fireEvent(state, 'esporte_prorrogacao', {}, { jogo: decisive.title });
+      // eventos esportivos da seção 8C.7 (seleção eliminada, final, rebaixamento, adiamento, concorrência...)
+      for (const e of sportsEventCandidates(state, changes)) fireEvent(state, e.templateId, {}, e.vars);
+    }
   }
   // contratos de direitos (v2): parcelas, horário prometido e vencimentos
   if (state.rightsContracts?.length) {

@@ -570,6 +570,10 @@ export function applyEffects(state: GameState, eff: EffectSet, ctx: GameEvent['c
       if (k === 'mbm') state.research.mbm = true;
       if (k === 'informante') state.flags.informante_until = week + 8;
       if (k === 'cancelou_recentemente') state.flags.cancelou_recentemente = week;
+      if (k === 'narrador_saiu') {
+        state.flags.narrador_saiu = week; // transmissões esportivas perdem qualidade por meio ano (Fase 6.4)
+        continue;
+      }
       state.flags[k] = v;
     }
   }

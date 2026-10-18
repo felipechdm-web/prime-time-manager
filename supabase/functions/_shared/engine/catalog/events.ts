@@ -717,6 +717,97 @@ export const EVENT_TEMPLATES: EventTemplate[] = [
     ],
     defaultOption: 'atrasar',
   },
+  // ===== esporte real (seção 8C.7): disparados pelo motor esportivo quando a situação acontece na partida =====
+  {
+    id: 'esporte_selecao_eliminada', category: 'esporte', title: 'A seleção caiu', severity: 'medio', tone: 'negativo',
+    subject: 'none', trigger: [], calendar: true, baseProb: 0, eras: U, universe: U, speaker: 'npc_comercial',
+    scene: 'O Brasil foi eliminado nas {fase} da Copa do Mundo. As cotas da Copa foram vendidas contando com mais jogos da seleção e os anunciantes já ligaram. "Diretor, a gente mantém a cobertura cheia até a final ou enxuga e devolve a grade?", pergunta Marta.',
+    options: [
+      { id: 'manter', label: 'Manter a cobertura cheia até a final', effects: { cashWeeks: -0.03, reputation: { public: 1 }, npc: [{ target: 'comercial', mood: -5 }] } },
+      { id: 'enxugar', label: 'Enxugar a cobertura e oferecer compensação aos anunciantes', effects: { cashWeeks: -0.015, npc: [{ target: 'comercial', mood: 3 }, { target: 'jornalismo', mood: -4 }] } },
+    ],
+    defaultOption: 'manter',
+  },
+  {
+    id: 'esporte_final_grande_torcida', category: 'esporte', title: 'Final com a maior torcida do país', severity: 'medio', tone: 'positivo',
+    subject: 'none', trigger: [], calendar: true, baseProb: 0, eras: U, universe: U, speaker: 'npc_comercial',
+    scene: 'Esta semana a {station} transmite {jogo}, decisão com uma das maiores torcidas do país. "Os anunciantes estão disputando os intervalos", conta Marta. "Dá para subir o preço da transmissão ou fechar um pacote especial com o digital."',
+    options: [
+      { id: 'subir_preco', label: 'Subir o preço dos intervalos da final', effects: { cashWeeks: 0.05, occupancy: { delta: -0.02, weeks: 1 }, npc: [{ target: 'comercial', mood: 6 }] } },
+      { id: 'pacote', label: 'Fechar um pacote TV + digital com patrocinador', effects: { cashWeeks: 0.035, reputation: { market: 2 }, npc: [{ target: 'comercial', mood: 4 }] } },
+    ],
+    defaultOption: 'pacote',
+  },
+  {
+    id: 'esporte_clube_rebaixado', category: 'esporte', title: 'Clube de grande torcida rebaixado', severity: 'medio', tone: 'negativo',
+    subject: 'none', trigger: [], calendar: true, baseProb: 0, eras: U, universe: U, speaker: 'npc_comercial',
+    scene: '{clube} foi rebaixado para a Série B. É uma das maiores torcidas do país e a audiência do Brasileirão do ano que vem vai sentir. Os patrocinadores das cotas pedem uma conversa.',
+    options: [
+      { id: 'desconto', label: 'Dar desconto nas cotas do ano que vem', effects: { cashWeeks: -0.02, npc: [{ target: 'comercial', mood: 4 }], reputation: { market: 1 } } },
+      { id: 'manter', label: 'Manter os preços e apostar no acesso imediato', effects: { occupancy: { delta: -0.03, weeks: 6 }, npc: [{ target: 'comercial', mood: -4 }] } },
+    ],
+    defaultOption: 'desconto',
+  },
+  {
+    id: 'esporte_jogo_adiado', category: 'esporte', title: 'Jogo adiado por conflito de calendário', severity: 'leve', tone: 'negativo',
+    subject: 'none', trigger: [], calendar: true, baseProb: 0, eras: U, universe: U, speaker: 'npc_artistico',
+    scene: '{jogo}, que a {station} ia transmitir, foi adiado: {motivo}. O horário do jogo voltou para a grade normal. "Preenchemos com a programação de sempre ou entramos com uma mesa-redonda especial?", pergunta Lúcia.',
+    options: [
+      { id: 'grade_normal', label: 'Seguir com a programação normal', effects: {} },
+      { id: 'mesa_redonda', label: 'Entrar com mesa-redonda especial no horário', effects: { cashWeeks: -0.005, reputation: { critics: 1 }, npc: [{ target: 'jornalismo', mood: 3 }] } },
+    ],
+    defaultOption: 'grade_normal',
+  },
+  {
+    id: 'esporte_mudanca_horario', category: 'esporte', title: 'A liga mudou o horário do jogo', severity: 'leve', tone: 'neutro',
+    subject: 'none', trigger: [], calendar: true, baseProb: 0, eras: U, universe: U, speaker: 'npc_juridico',
+    scene: '{jogo} mudou de horário: {motivo}. A grade da {station} vai se ajustar ao novo horário. A Dra. Helena pergunta se a emissora aceita em silêncio ou registra protesto junto à organizadora.',
+    options: [
+      { id: 'aceitar', label: 'Aceitar e ajustar a grade', effects: { npc: [{ target: 'artistico', mood: -2 }] } },
+      { id: 'protestar', label: 'Registrar protesto formal', effects: { npc: [{ target: 'juridico', trust: 2 }], reputation: { market: -1 } } },
+    ],
+    defaultOption: 'aceitar',
+  },
+  {
+    id: 'esporte_narrador_assediado', category: 'esporte', title: 'Narrador da casa assediado pela concorrência', severity: 'medio', tone: 'negativo',
+    subject: 'none', trigger: [], calendar: true, baseProb: 0, eras: U, universe: U, speaker: 'npc_artistico',
+    scene: '{narrador}, a voz das transmissões esportivas da {station}, recebeu uma proposta da {rival}. "Ele gosta daqui, mas a oferta é alta", diz Lúcia. Sem ele, as transmissões perdem qualidade por uns meses.',
+    options: [
+      { id: 'cobrir', label: 'Cobrir a oferta', effects: { cashWeeks: -0.03, npc: [{ target: 'artistico', mood: 5 }] } },
+      { id: 'deixar', label: 'Deixar ir e promover alguém da equipe', effects: { flag: { narrador_saiu: true }, npc: [{ target: 'artistico', mood: -6 }] } },
+    ],
+    defaultOption: 'cobrir',
+  },
+  {
+    id: 'esporte_patrocinador_exclusividade', category: 'esporte', title: 'Patrocinador exige exclusividade de categoria', severity: 'leve', tone: 'neutro',
+    subject: 'none', trigger: [], calendar: true, baseProb: 0, eras: U, universe: U, speaker: 'npc_comercial',
+    scene: 'Um patrocinador das cotas do esporte quer exclusividade de categoria: nenhum concorrente dele nos intervalos das transmissões. Paga mais por isso, mas a {station} perde outros anunciantes do mesmo setor.',
+    options: [
+      { id: 'aceitar', label: 'Aceitar a exclusividade', effects: { cashWeeks: 0.05, occupancy: { delta: -0.02, weeks: 8 }, npc: [{ target: 'comercial', mood: 3 }] } },
+      { id: 'recusar', label: 'Recusar e manter os intervalos abertos', effects: { cashWeeks: -0.01, npc: [{ target: 'comercial', mood: -4 }] } },
+    ],
+    defaultOption: 'aceitar',
+  },
+  {
+    id: 'esporte_briga_em_campo', category: 'esporte', title: 'Briga em campo vira caso de imagem', severity: 'leve', tone: 'negativo',
+    subject: 'none', trigger: [], calendar: true, baseProb: 0, eras: U, universe: U, speaker: 'npc_jornalismo',
+    scene: 'Na transmissão de {jogo}, um empurra-empurra entre jogadores terminou com cartão vermelho e virou assunto nas redes. O Jornalismo quer saber se a {station} repete as imagens nos telejornais ou corta o assunto.',
+    options: [
+      { id: 'repetir', label: 'Repetir as imagens e debater', effects: { allBuzz: 3, reputation: { critics: -2, public: 1 } } },
+      { id: 'cortar', label: 'Cortar as imagens e falar só de futebol', effects: { reputation: { critics: 2 }, npc: [{ target: 'jornalismo', mood: 2 }] } },
+    ],
+    defaultOption: 'cortar',
+  },
+  {
+    id: 'esporte_leilao_prazo', category: 'esporte', title: 'Concorrência de direitos com prazo apertado', severity: 'medio', tone: 'neutro',
+    subject: 'none', trigger: [], calendar: true, baseProb: 0, eras: U, universe: U, speaker: 'npc_comercial',
+    scene: 'Abriu a concorrência pelos direitos de {competicao} ({ciclo}). As propostas fecham até {prazo}. "Se a gente quer entrar, tem que montar o projeto de transmissão agora", diz Marta.',
+    options: [
+      { id: 'preparar', label: 'Montar a proposta (abre no Mercado de Direitos)', effects: { agenda: -2, flag: { concorrencia_preparada: true }, npc: [{ target: 'comercial', mood: 4 }] } },
+      { id: 'passar', label: 'Deixar essa passar', effects: { npc: [{ target: 'comercial', mood: -3 }] } },
+    ],
+    defaultOption: 'passar',
+  },
   {
     id: 'hgpe_aviso', category: 'regulacao', title: 'Horário eleitoral começa na semana que vem', severity: 'leve', tone: 'neutro',
     subject: 'none', trigger: [], calendar: true,

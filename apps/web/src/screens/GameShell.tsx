@@ -22,6 +22,7 @@ import { Boletim } from './Boletim.tsx';
 import { Grade } from './Grade.tsx';
 import { Acervo } from './Acervo.tsx';
 import { Direitos } from './Direitos.tsx';
+import { Esportes } from './Esportes.tsx';
 import { Inbox } from './Inbox.tsx';
 import { Reunioes } from './Reunioes.tsx';
 import { Comercial } from './Comercial.tsx';
@@ -38,6 +39,7 @@ export const NAV: { id: string; label: string; icon: string }[] = [
   { id: 'reunioes', label: 'Reuniões', icon: '🤝' },
   { id: 'acervo', label: 'Acervo e Mercado', icon: '🎞️' },
   { id: 'direitos', label: 'Mercado de Direitos', icon: '📜' },
+  { id: 'esportes', label: 'Central de Esportes', icon: '⚽' },
   { id: 'comercial', label: 'Comercial', icon: '💰' },
   { id: 'pessoas', label: 'Pessoas', icon: '👥' },
   { id: 'concorrencia', label: 'Concorrência', icon: '📡' },
@@ -99,6 +101,8 @@ export function GameShell({ gameId, screen }: { gameId: string; screen: string }
   const midWeek = state.weekProgress.day > 0 && state.weekProgress.day < 7;
   const active = state.meta.status === 'active';
   const mode = backendSync().mode;
+  // Central de Esportes só aparece nas partidas com esporte real (Fase 6.4)
+  const nav = NAV.filter((n) => n.id !== 'esportes' || !!state.sports);
 
   let content: ReactNode;
   const props: ScreenProps = { gameId, state };
@@ -106,6 +110,7 @@ export function GameShell({ gameId, screen }: { gameId: string; screen: string }
     case 'grade': content = <Grade {...props} />; break;
     case 'acervo': content = <Acervo {...props} />; break;
     case 'direitos': content = <Direitos {...props} />; break;
+    case 'esportes': content = <Esportes {...props} />; break;
     case 'caixa': content = <Inbox {...props} />; break;
     case 'reunioes': content = <Reunioes {...props} />; break;
     case 'comercial': content = <Comercial {...props} />; break;
@@ -147,7 +152,7 @@ export function GameShell({ gameId, screen }: { gameId: string; screen: string }
             <span className="block text-xs text-muted">{era.name} · {era.tagline}</span>
           </span>
         </button>
-        <nav className="flex flex-1 flex-col gap-1 px-2">{NAV.map((n) => navButton(n.id))}</nav>
+        <nav className="flex flex-1 flex-col gap-1 px-2">{nav.map((n) => navButton(n.id))}</nav>
         <div className="border-t border-border p-3 text-xs text-muted">
           <div>{mode === 'demo' ? 'Modo demonstração (sem IA)' : 'Modo nuvem'}</div>
           <button className="mt-1 underline-offset-2 hover:underline" onClick={() => go('/')}>← Todas as partidas</button>
@@ -200,7 +205,7 @@ export function GameShell({ gameId, screen }: { gameId: string; screen: string }
           <div className="fixed inset-0 z-40 lg:hidden" onClick={() => setMoreOpen(false)}>
             <div className="absolute inset-0 bg-black/50" />
             <div className="fade-in safe-bottom absolute inset-x-2 bottom-16 grid grid-cols-2 gap-1 rounded-2xl border border-border bg-surface p-2 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-              {NAV.filter((n) => !MOBILE_MAIN.includes(n.id)).map((n) => navButton(n.id))}
+              {nav.filter((n) => !MOBILE_MAIN.includes(n.id)).map((n) => navButton(n.id))}
               <button onClick={() => go('/')} className="col-span-2 rounded-theme px-3 py-2 text-left text-sm text-muted hover:bg-surface-2">← Todas as partidas</button>
             </div>
           </div>
