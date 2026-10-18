@@ -2,14 +2,14 @@
 // gênero de jogo de cada título, exclusividades e divergências. Funções puras, sem I/O.
 
 import { GENRES } from './catalog/genres.ts';
-import type { CatalogHolderSnap, CatalogSlotSnap, CatalogSnapshot, CatalogTitleSnap, Divergence, GameState, GenreId } from './types.ts';
+import type { CatalogHolderSnap, CatalogSlotSnap, CatalogSnapshot, CatalogTitleSnap, Divergence, GameState, GenreId, SportsCatalogSnap, SportsClubSnap, SportsCompetitionSnap } from './types.ts';
 
 type Row = Record<string, unknown>;
 const str = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? v.trim() : null);
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : typeof v === 'string' && v.trim() && Number.isFinite(Number(v)) ? Number(v) : null);
 
 // Monta a cópia do catálogo a partir das linhas aprovadas do banco (formato das tabelas da seção 18.1).
-export function buildCatalogSnapshot(rows: { titles: Row[]; templates: Row[]; rights: Row[]; holders: Row[] }): CatalogSnapshot | null {
+export function buildCatalogSnapshot(rows: { titles: Row[]; templates: Row[]; rights: Row[]; holders: Row[]; sports?: { competitions: Row[]; clubs: Row[]; fanbase: Row[] } }): CatalogSnapshot | null {
   const titles: CatalogTitleSnap[] = rows.titles.map((r) => {
     const attrs = (r.game_attrs && typeof r.game_attrs === 'object' ? r.game_attrs : {}) as CatalogTitleSnap['attrs'];
     const hist = Array.isArray(r.br_history) ? (r.br_history as Row[]) : [];
@@ -57,7 +57,40 @@ export function buildCatalogSnapshot(rows: { titles: Row[]; templates: Row[]; ri
     };
   }).sort((a, b) => a.id.localeCompare(b.id));
   if (!titles.length && !grids.length) return null;
-  return { titles, grids, rights, holders };
+  const sports = rows.sports ? buildSportsSnapshot(rows.sports) : null;
+  return { titles, grids, rights, holders, ...(sports ? { sports } : {}) };
+}
+
+// Competições, clubes e torcidas aprovados (Fase 6.4). Sem competição aprovada, a partida não tem esporte real.
+export function buildSportsSnapshot(rows: { competitions: Row[]; clubs: Row[]; fanbase: Row[] }): SportsCatalogSnap | null {
+  const obj = (v: unknown): Row => (v && typeof v === 'object' && !Array.isArray(v) ? v as Row : {});
+  const competitions: SportsCompetitionSnap[] = rows.competitions
+    .filter((r) => !Array.isArray(r.eras) || (r.eras as unknown[]).includes('now'))
+    .map((r) => ({
+      id: String(r.id), name: String(r.name ?? r.id),
+      kind: (['liga', 'copa', 'evento', 'gp', 'luta'].includes(String(r.kind)) ? r.kind : 'liga') as SportsCompetitionSnap['kind'],
+      scope: String(r.scope ?? 'nacional'), sport: String(r.sport ?? 'futebol'),
+      holderId: str(r.rights_holder_id), baseAppeal: num(r.base_appeal) ?? 50,
+      format: obj(r.format), calendar: obj(r.calendar_rules),
+      participants: Object.fromEntries(Object.entries(obj(r.participants)).filter(([, v]) => Array.isArray(v)).map(([k, v]) => [k, (v as unknown[]).map(String)])),
+    }))
+    .sort((a, b) => a.id.localeCompare(b.id));
+  if (!competitions.length) return null;
+  const clubs: SportsClubSnap[] = rows.clubs.map((r) => ({
+    id: String(r.id), name: String(r.name ?? r.id),
+    ratings: Object.fromEntries(Object.entries(obj(r.rating_by_season)).map(([k, v]) => [k, num(v) ?? 60])),
+    rivals: (Array.isArray(r.rivalries) ? r.rivalries as Row[] : [])
+      .filter((x) => str(x.club))
+      .map((x) => ({ club: String(x.club), weight: num(x.weight) ?? 1, ...(str(x.name) ? { name: String(x.name) } : {}) })),
+  })).sort((a, b) => a.id.localeCompare(b.id));
+  const fanbase: Record<string, Record<string, number>> = {};
+  for (const r of [...rows.fanbase].sort((a, b) => `${a.club_id}${a.market_id}`.localeCompare(`${b.club_id}${b.market_id}`))) {
+    if (r.era_id && r.era_id !== 'now') continue;
+    const share = num(r.share);
+    if (share === null) continue;
+    (fanbase[String(r.club_id)] ??= {})[String(r.market_id)] = share;
+  }
+  return { competitions, clubs, fanbase };
 }
 
 // "seg-sex", "sab", "qua,sex", "seg,qui,sex" -> dias 0..6 (segunda = 0)

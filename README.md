@@ -91,6 +91,12 @@ prime-time-manager/
   mexem no máximo 5% no mínimo e blefes são testados contra o interesse real dos rivais. A IA (Haiku, esforço baixo)
   só lê a fala do jogador e dá voz à decisão; o segredo do player fica em `negotiation_secrets`, que o navegador não
   lê. Exclusividades reais da largada viram contratos ativos (tela Contratos).
+- **Esporte real (v2, seção 8C, em construção na Fase 6.4)**: com competições aprovadas no catálogo, a partida ganha
+  o motor esportivo (`engine/sports.ts`). O calendário (datas e horários da era, pausa da Copa, estaduais no fim de
+  semana) sai da semente da partida; o estado guarda só placares, mudanças de horário e adiamentos impostos pela liga.
+  Resultados por modelo de gols (Poisson: força, mando e fase), classificação, mata-mata com prorrogação e pênaltis,
+  acesso e rebaixamento entre temporadas. A audiência de um jogo usa a fórmula da seção 8C.4 com a torcida de cada
+  praça; jogos da seleção e finais aumentam a TV ligada. Atletas reais não aparecem: os lances falam em "o camisa 9".
 - **Modelos (v2, seção 17.5)**: todas as funções usam `claude-haiku-5-5` com esforço baixo e raciocínio desligado;
   cada função tem o seu `max_tokens` (`supabase/functions/_shared/game/llmConfig.ts`). O Sonnet 5.5 fica como
   modo premium desligado (`LLM_PREMIUM=on` liga, só na avaliação com a presidência). Tudo pode ser trocado por

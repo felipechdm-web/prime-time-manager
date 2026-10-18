@@ -467,6 +467,55 @@ export interface CatalogSnapshot {
   grids: { stationKey: string; referenceMonth: string; slots: CatalogSlotSnap[] }[];
   rights: { productRef: string; holderStationKey: string; validFrom: string | null; validTo: string | null; exclusive: boolean; kind?: string }[];
   holders: CatalogHolderSnap[];
+  sports?: SportsCatalogSnap; // v2 (Fase 6.4): competições, clubes e torcidas aprovados
+}
+
+// ===== Esporte (v2, seção 8C) =====
+export interface SportsCompetitionSnap {
+  id: string;
+  name: string;
+  kind: 'liga' | 'copa' | 'evento' | 'gp' | 'luta';
+  scope: string;
+  sport: string;
+  holderId: string | null;
+  baseAppeal: number; // B da seção 8C.4 (0-100, estimativa)
+  format: Record<string, unknown>;
+  calendar: Record<string, unknown>; // temporada -> regras; "concorrencias" -> ciclos de direitos
+  participants: Record<string, string[]>;
+}
+export interface SportsClubSnap {
+  id: string;
+  name: string;
+  ratings: Record<string, number>; // temporada -> força 0-100
+  rivals: { club: string; weight: number; name?: string }[];
+}
+export interface SportsCatalogSnap {
+  competitions: SportsCompetitionSnap[];
+  clubs: SportsClubSnap[];
+  fanbase: Record<string, Record<string, number>>; // clube -> praça -> fatia da torcida
+}
+
+// placar: [gols do mandante, gols do visitante, pênaltis do mandante, pênaltis do visitante, prorrogação (1)]
+export type MatchScore = number[];
+export interface SportsChange {
+  date: string;
+  time: string;
+  kind: 'horario' | 'adiado';
+  reason: string;
+  fromDate: string;
+  fromTime: string;
+}
+export interface SeasonSummary {
+  champion: string | null;
+  runnerUp: string | null;
+  table?: string[]; // classificação final (ligas)
+}
+export interface SportsState {
+  results: Record<string, MatchScore>; // código do jogo -> placar (só da temporada em curso)
+  changes: Record<string, SportsChange>; // mudanças de horário e adiamentos impostos pela liga
+  picks: Record<string, string[]>; // código do jogo -> emissoras que transmitem (Fase 6.4, passo 4)
+  done: Record<string, SeasonSummary>; // "competição|temporada" encerrada
+  checkedUntil: string; // até que data as mudanças de calendário já foram sorteadas
 }
 
 // player de direitos (Fase 6.3): perfil de negociação e representante fictício vêm do catálogo
@@ -683,6 +732,7 @@ export interface GameState {
   pendingDivergences?: Divergence[]; // gravadas na tabela divergences pelo servidor, como a caixa de saída
   rightsContracts?: RightsContract[]; // v2: contratos de direitos (largada e negociados); espelhados em rights_contracts
   holderRel?: Record<string, Record<string, HolderRelation>>; // v2: relacionamento player -> emissora (0 a 100)
+  sports?: SportsState; // v2 (Fase 6.4): resultados, mudanças de calendário e transmissões do esporte real
 }
 
 export interface InboxDraft {

@@ -7,7 +7,7 @@
     "node": ">=24"
   },
   "scripts": {
-    "test": "node --test tests/engine.test.ts tests/handlers.test.ts tests/catalog.test.ts tests/catalogWorld.test.ts tests/negotiation.test.ts tests/negotiationHandlers.test.ts",
+    "test": "node --test tests/engine.test.ts tests/handlers.test.ts tests/catalog.test.ts tests/catalogWorld.test.ts tests/negotiation.test.ts tests/negotiationHandlers.test.ts tests/sports.test.ts",
     "calibrate": "node scripts/calibrate.ts",
     "events-stats": "node scripts/events-stats.ts",
     "custo": "node scripts/custo-semana.ts",

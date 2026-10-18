@@ -11,6 +11,7 @@ import { annualScore, computeKpis, verdictFor } from './kpis.ts';
 import { computeLiveMoments } from './live.ts';
 import { devProgress, refreshOffers, resolveAuctions } from './market.ts';
 import { processContracts } from './negotiation.ts';
+import { advanceSports, planCalendarChanges } from './sports.ts';
 import { money } from './money.ts';
 import { boletimFallback, dayFallback, evaluationFallback } from './narrative.ts';
 import { buildWeekReport, PA, programResultsFromAcc } from './report.ts';
@@ -505,6 +506,7 @@ export function closeWeek(state: GameState, out: SimOutputs, opts: { warmup?: bo
   if (warm) return;
 
   const newDate = state.meta.date;
+  if (state.sports) advanceSports(state, newDate); // esporte real: placares dos jogos da semana que passou
   const closings: string[] = [];
   if (monthOf(newDate) !== monthOf(prevDate)) closings.push(...closeMonth(state, out, prevDate));
   if (yearOf(newDate) !== yearOf(prevDate)) closings.push(...closeYear(state, out, yearOf(prevDate)));
@@ -772,6 +774,8 @@ export function startWeek(state: GameState, out: SimOutputs, opts: { quiet?: boo
     pushTimeline(state, `"${p.title}" ficou pronto para estrear.`, 'programa');
   }
   for (const n of resolveAuctions(state)) inbox(state, { fromNpc: 'npc_comercial', subject: 'Resultado do leilão', body: n, requiresAction: false, eventId: null, kind: 'mensagem' });
+  // esporte real (v2): a liga muda horários e adia jogos das próximas semanas
+  if (state.sports) planCalendarChanges(state, state.meta.date);
   // contratos de direitos (v2): parcelas, horário prometido e vencimentos
   if (state.rightsContracts?.length) {
     const rc = processContracts(state);

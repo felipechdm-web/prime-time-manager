@@ -126,7 +126,19 @@ async function loadCatalogSnapshot(ctx: HandlerCtx): Promise<CatalogSnapshot | n
       ctx.store.select('historical_rights', { approved: true, era_id: 'now' }),
       ctx.store.select('rights_holders', { approved: true }),
     ]);
-    return buildCatalogSnapshot({ titles, templates, rights, holders });
+    // esporte (Fase 6.4) à parte: se a migração do esporte ainda não foi aplicada, o resto do catálogo continua valendo
+    let sports: { competitions: Record<string, unknown>[]; clubs: Record<string, unknown>[]; fanbase: Record<string, unknown>[] } | undefined;
+    try {
+      const [competitions, clubs, fanbase] = await Promise.all([
+        ctx.store.select('sports_competitions', { approved: true }),
+        ctx.store.select('clubs', { approved: true }),
+        ctx.store.select('club_fanbase', { approved: true, era_id: 'now' }),
+      ]);
+      sports = { competitions, clubs, fanbase };
+    } catch {
+      sports = undefined;
+    }
+    return buildCatalogSnapshot({ titles, templates, rights, holders, sports });
   } catch {
     return null; // tabelas do catálogo ainda não criadas
   }

@@ -6,6 +6,8 @@ import { GENRES, genreFit } from './catalog/genres.ts';
 import { MARKETS, MARKET_WEIGHTS, SEGMENTS, segmentWeights, TLE_CURVE } from './catalog/markets.ts';
 import { rngFor } from './rng.ts';
 import { cloneWeek, copaSlotsForDate, dayPlanWithOverlays, slotArray } from './schedule.ts';
+import { eventTleMult, fixtureByCode, programMarketInterest } from './sports.ts';
+import type { Fixture } from './sports.ts';
 import { activeStations, difficultyMult, getProgram, talentStrength } from './state.ts';
 import type { Block, GameState, Program, Station } from './types.ts';
 import { addDays, bandOfSlot, dayCalendar, dayType, isPrimeSlot, monthOf, slotClockMinutes, SLOTS_PER_DAY } from './time.ts';
@@ -161,6 +163,10 @@ export function computeDay(state: GameState, day: number, opts: DayOptions): Day
     parts: { q: number; b: number; h: number; f: number; t: number };
     appealRaw: number;
     station: number;
+    // jogo do esporte real (seção 8C.4): interesse por praça no lugar do apelo único do programa
+    market?: number[];
+    marketPnt?: number;
+    prof?: number[];
   }
   const puCache = new Map<string, PU>();
   const powerW = STATION_POWER_W;
@@ -192,6 +198,14 @@ export function computeDay(state: GameState, day: number, opts: DayOptions): Day
       const appealRaw = (p.appeal / 100) * lifeCurveFactor(p);
       const appeal = SEGMENTS.map((s) => W.a * appealRaw * p.profile[s]);
       pu = { base: q + b + h - f + t + noise + mods, appeal, group: g.group, genre: p.genre, noise, parts: { q, b, h, f, t }, appealRaw, station: stationTermBase[stIdx] };
+      const mi = state.sports ? programMarketInterest(state, p) : null;
+      if (mi) {
+        pu.market = mi.markets;
+        pu.marketPnt = mi.pnt;
+        pu.prof = SEGMENTS.map((s) => p.profile[s]);
+        pu.appeal = SEGMENTS.map((s) => W.a * mi.pnt * p.profile[s]);
+        pu.appealRaw = mi.pnt;
+      }
     }
     puCache.set(key, pu);
     return pu;
@@ -230,6 +244,22 @@ export function computeDay(state: GameState, day: number, opts: DayOptions): Day
   for (const c of copa) {
     const peak = c.stage >= 7 ? 1.25 : c.stage >= 5 ? 1.15 : 1.05;
     for (let i = 0; i < 9; i++) if (c.slot + i < SLOTS_PER_DAY) copaMult[c.slot + i] = Math.max(copaMult[c.slot + i], peak);
+  }
+  // jogos do esporte real no ar: multiplicador de evento no TLE (seleção em todas as praças; finais pela torcida local)
+  const eventAirs: { from: number; to: number; fx: Fixture }[] = [];
+  if (state.sports) {
+    slotPrograms.forEach((slots) => {
+      let t = 0;
+      while (t < SLOTS_PER_DAY) {
+        const pid = slots[t];
+        let e = t + 1;
+        while (e < SLOTS_PER_DAY && slots[e] === pid) e++;
+        const code = pid ? getProgram(state, pid)?.flags.fixture : null;
+        const fx = typeof code === 'string' ? fixtureByCode(state, code) : null;
+        if (fx) eventAirs.push({ from: t, to: e, fx });
+        t = e;
+      }
+    });
   }
   const pIdx = playerIdx(stations);
   let playerTleMod = 1;
@@ -273,6 +303,20 @@ export function computeDay(state: GameState, day: number, opts: DayOptions): Day
     const ptsM: number[][] = stations.map(() => new Array(SLOTS_PER_DAY).fill(0));
     const tleM: number[] = new Array(SLOTS_PER_DAY).fill(0);
     const expU = new Array(S + 1).fill(0);
+    let eventMult: number[] | null = null;
+    let eventFloor: boolean[] | null = null; // jogo da seleção: TV ligada no patamar do horário nobre, como na Copa
+    if (eventAirs.length) {
+      eventMult = new Array(SLOTS_PER_DAY).fill(1);
+      eventFloor = new Array(SLOTS_PER_DAY).fill(false);
+      for (const ea of eventAirs) {
+        const m = eventTleMult(state, ea.fx, mIdx);
+        const selecao = ea.fx.home === 'selecao:brasil' || ea.fx.away === 'selecao:brasil';
+        for (let k = ea.from; k < ea.to; k++) {
+          eventMult[k] = Math.max(eventMult[k], m);
+          if (selecao) eventFloor[k] = true;
+        }
+      }
+    }
 
     for (let t = 0; t < SLOTS_PER_DAY; t++) {
       const band = bandOfSlot(t);
@@ -281,6 +325,7 @@ export function computeDay(state: GameState, day: number, opts: DayOptions): Day
       if (band === 'meio_dia') tle *= lunch;
       if (isPrimeSlot(t)) tle *= cal.primeMult;
       if (copaMult[t] > 0) tle = Math.max(tle, P.tlePrime * (1 - P.digitalEscape) * 0.95) * copaMult[t];
+      if (eventMult && eventMult[t] > 1) tle = (eventFloor![t] ? Math.max(tle, P.tlePrime * (1 - P.digitalEscape) * 0.95) : tle) * eventMult[t];
       tle = Math.min(0.92, tle);
       tleM[t] = tle * 100;
       const segW = segmentWeights(hour, dt, P.kidsTV, abIndex);
@@ -296,7 +341,8 @@ export function computeDay(state: GameState, day: number, opts: DayOptions): Day
           } else {
             const pu = programUtility(pid, c);
             const fit = W.g * genreFit(pu.genre, band, dt);
-            u = pu.base + pu.appeal[s] + fit + stTerm[c] + marketNoise[c];
+            const appeal = pu.market ? W.a * (mIdx >= 0 ? pu.market[mIdx] : pu.marketPnt!) * pu.prof![s] : pu.appeal[s];
+            u = pu.base + appeal + fit + stTerm[c] + marketNoise[c];
             if (live.size) {
               const bb = blockBounds[c].get(pid);
               if (bb) u += liveAdj(pid, t, bb[0], bb[1]);
