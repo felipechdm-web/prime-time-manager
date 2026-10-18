@@ -435,6 +435,7 @@ export interface MarketOffer {
   flagCopa?: number;
   catalogTitleId?: string; // v2: oferta de um título real do catálogo
   lockedBy?: { stationKey: string; stationName: string; until: string | null }; // exclusivo de outra emissora: visível, sem compra
+  partner?: string; // coberto pelo acordo de exclusividade do jogador: só ele licencia, com desconto, sem rivais
 }
 
 // ===== catálogo real (v2, seção 8A): cópia dos itens aprovados, guardada na partida ao ser criada =====

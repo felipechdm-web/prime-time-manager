@@ -12,6 +12,8 @@ import { validateMestrePlain } from '../supabase/functions/_shared/game/validato
 import { resolveLLMConfig } from '../supabase/functions/_shared/game/llmConfig.ts';
 import type { HandlerCtx, LLMProvider, LLMRequest } from '../supabase/functions/_shared/game/types.ts';
 import type { NegPublic } from '../supabase/functions/_shared/engine/negotiation.ts';
+import { defaultTerms, fairValue, openNegotiation, partnerDeal, rivalSnipe } from '../supabase/functions/_shared/engine/negotiation.ts';
+import { titleById } from '../supabase/functions/_shared/engine/catalogWorld.ts';
 import type { GameState } from '../supabase/functions/_shared/engine/types.ts';
 import { buildLote1, buildLote2a, buildLote2b, buildLote3 } from '../supabase/seeds/build.ts';
 
@@ -162,6 +164,34 @@ test('título com exclusividade de outra emissora: reunião só de relacionament
   const r = await negotiationTurnHandler(ctx, { negotiationId: o.negotiationId, terms: { valor: 999_000_000 }, tags: ['parceria_longa'] }) as { decision: { type: string } };
   assert.equal(r.decision.type, 'recusa');
   await assert.rejects(() => negotiationCloseHandler(ctx, { negotiationId: o.negotiationId }), /acordo/);
+});
+
+test('título coberto pela exclusividade do próprio jogador (SBT × Televisa): sem rivais, sem "rival fechou antes" e 25% a 30% mais barato', async () => {
+  const store = storeWithCatalog();
+  const ctx = ctxWith(store, null);
+  const { gameId } = await createGame(ctx, { ...NEW, station: { mode: 'real', realKey: 'sbt' } });
+  const state = await stateOf(store, gameId);
+  const ps = state.stations.find((s) => s.isPlayer)!;
+  const browse = await catalogBrowseHandler(ctx, { gameId }) as { holders: { id: string; titles: { id: string; locked: string | null; partner: string | null; owned: boolean }[] }[] };
+  const usurpadora = browse.holders.find((h) => h.id === 'televisa')!.titles.find((t) => t.id === 'a_usurpadora')!;
+  assert.equal(usurpadora.locked, null);
+  assert.match(usurpadora.partner ?? '', /^acordo de exclusividade com a TelevisaUnivision até 12\/2028$/);
+  const t = titleById(state, 'a_usurpadora')!;
+  const deal = partnerDeal(state, ps.id, t)!;
+  assert.ok(deal.discount >= 0.25 && deal.discount <= 0.3, `desconto ${deal.discount}`);
+  const o = openNegotiation(state, { stationId: ps.id, titleId: t.id, key: 'k1' });
+  assert.ok(!('error' in o));
+  if ('error' in o) return;
+  assert.deepEqual(o.hidden.rivals, [], 'ninguém mais pode licenciar na TV aberta');
+  assert.equal(o.pub.partner, deal.label);
+  assert.equal(o.pub.kind, 'titulo');
+  const ratio = o.hidden.vRef / fairValue(state, ps.id, t, defaultTerms(t));
+  assert.ok(Math.abs(ratio - (1 - deal.discount)) < 0.01, `valor justo com desconto de parceiro (${ratio})`);
+  assert.equal(rivalSnipe(state, o.hidden, 8), null, 'nenhum rival fecha antes');
+  // a mesma novela para uma emissora fictícia: travada, sem acordo nem desconto
+  const fic = await createGame(ctx, NEW);
+  const fs = await stateOf(store, fic.gameId);
+  assert.equal(partnerDeal(fs, fs.stations.find((s) => s.isPlayer)!.id, titleById(fs, 'a_usurpadora')!), null);
 });
 
 test('reunião sem o segredo gravado (versão antiga): o motor recria o mesmo segredo e a rodada segue', async () => {

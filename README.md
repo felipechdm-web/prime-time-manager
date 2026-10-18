@@ -90,7 +90,9 @@ prime-time-manager/
   alvo por estilo do player, decide aceite, recusa ou contraproposta pela utilidade e cede a cada rodada; argumentos
   mexem no máximo 5% no mínimo e blefes são testados contra o interesse real dos rivais. A IA (Haiku, esforço baixo)
   só lê a fala do jogador e dá voz à decisão; o segredo do player fica em `negotiation_secrets`, que o navegador não
-  lê. Exclusividades reais da largada viram contratos ativos (tela Contratos).
+  lê. Exclusividades reais da largada viram contratos ativos (tela Contratos). Uma exclusividade de catálogo (ex.: SBT ×
+  TelevisaUnivision) não inclui a licença de cada título: quem tem o acordo ainda negocia cada novela, mas é o único
+  comprador na TV aberta (sem rivais na mesa, nenhum rival "fecha antes") e paga de 25% a 30% menos.
 - **Esporte real (v2, seção 8C, em construção na Fase 6.4)**: com competições aprovadas no catálogo, a partida ganha
   o motor esportivo (`engine/sports.ts`). O calendário (datas e horários da era, pausa da Copa, estaduais no fim de
   semana) sai da semente da partida; o estado guarda só placares, mudanças de horário e adiamentos impostos pela liga.

@@ -152,6 +152,7 @@ function Market({ gameId, state }: ScreenProps) {
                   {o.genre && o.kind !== 'cota' && o.kind !== 'talento' && <GenreChip genre={o.genre} small />}
                   {o.catalogTitleId && <Badge>título real</Badge>}
                   {o.lockedBy && <Badge tone="warn">🔒 {lockLabel(o.lockedBy)}</Badge>}
+                  {o.partner && <Badge tone="good">🤝 seu acordo</Badge>}
                   <span className="ml-auto text-[11px] text-muted">expira na semana {o.expiresWeek + 1}</span>
                 </div>
                 <div className="font-bold leading-tight">{o.title}</div>
@@ -179,6 +180,7 @@ function Market({ gameId, state }: ScreenProps) {
                     // título real: preço e aceite saem da Mesa de Negociação (Fase 6.3)
                     <div className="space-y-1.5">
                       {o.lockedBy && <p className="rounded border border-border px-3 py-2 text-center text-xs text-muted">Não está à venda: {lockLabel(o.lockedBy)}.</p>}
+                      {o.partner && <p className="rounded border border-good/40 px-3 py-2 text-center text-xs text-good">Coberto pelo seu {o.partner}: só você licencia, sem concorrência e com 25% a 30% de desconto.</p>}
                       <Button variant={o.lockedBy ? 'secondary' : 'primary'} full onClick={() => go(`g/${gameId}/direitos?title=${o.catalogTitleId}`)}>
                         {o.lockedBy ? 'Reunião de relacionamento com o player' : 'Negociar com o player'}
                       </Button>

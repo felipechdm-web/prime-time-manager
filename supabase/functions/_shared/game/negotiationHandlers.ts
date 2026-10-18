@@ -11,7 +11,7 @@ import { recomputePrice } from '../engine/commercial.ts';
 import { money } from '../engine/money.ts';
 import {
   acceptCounter, adjustRelation, ARGUMENT_TAGS, BLUFF_DISTRUST_DAYS, contractFromDeal, evaluateRound, holderCatalog, holderOf, normalizeTerms,
-  openNegotiation, referencePrice, relationOf, researchDossier, rivalSnipe,
+  openNegotiation, partnerDeal, referencePrice, relationOf, researchDossier, rivalSnipe,
 } from '../engine/negotiation.ts';
 import type { NegDecision, NegHidden, NegPublic, RivalBid } from '../engine/negotiation.ts';
 import { rngFor } from '../engine/rng.ts';
@@ -113,6 +113,7 @@ function envelopeOf(state: GameState, pub: NegPublic, decision: { type: string; 
     concorrencia_que_pode_citar: pub.rivalMentions,
     blefe_do_jogador: decision.bluff ?? null,
     produto_travado: pub.locked,
+    acordo_vigente_com_o_jogador: pub.partner ?? null, // título coberto pela exclusividade do jogador: sem concorrência
   };
 }
 
@@ -242,6 +243,7 @@ export async function catalogBrowseHandler(ctx: HandlerCtx, body: Record<string,
         reference: referencePrice(state, ps.id, t),
         locked: lockedFor ?? (heldBy(state, t, ps.id) ? `com a ${heldBy(state, t, ps.id)}` : null),
         owned: state.programs.some((p) => p.stationId === ps.id && p.catalogTitleId === t.id),
+        partner: partnerDeal(state, ps.id, t)?.label ?? null,
         negotiation: neg ? { id: String(neg.id), status: String(neg.status) } : null,
         brStations: t.brStations,
       };

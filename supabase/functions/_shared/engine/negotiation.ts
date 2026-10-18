@@ -93,6 +93,7 @@ export interface NegPublic {
   rivalMentions: string[]; // concorrência que o representante pode citar
   status: 'aberta' | 'pausada' | 'fechada' | 'fracassada';
   locked: string | null; // "exclusivo do SBT até 12/2028": produto travado para este comprador
+  partner?: string | null; // "acordo de exclusividade com a TelevisaUnivision até 12/2028": produto coberto pelo acordo do comprador
 }
 
 export type DecisionType = 'aceite' | 'contraproposta' | 'recusa' | 'fim';
@@ -241,7 +242,22 @@ export function fairValue(state: GameState, stationId: string, t: CatalogTitleSn
 export function referencePrice(state: GameState, stationId: string, t: CatalogTitleSnap): number {
   const rng = rngFor(state.meta.seed, 'refprice', t.id, stationId, state.meta.weekIndex);
   const err = clamp(16 - state.research.precision / 9, 4, 16) / 100;
-  return marketRound(fairValue(state, stationId, t) * (1 + rng.range(-err, err)));
+  const deal = partnerDeal(state, stationId, t);
+  return marketRound(fairValue(state, stationId, t) * (1 - (deal?.discount ?? 0)) * (1 + rng.range(-err, err)));
+}
+
+// acordo de exclusividade do próprio comprador (seção 8A.6): só ele licencia o título na TV aberta, então não há rivais
+// na mesa, e o parceiro cobra de 25% a 30% menos (desconto fixo por título e emissora, para a vitrine e a mesa baterem)
+export function partnerDeal(state: GameState, stationId: string, t: CatalogTitleSnap): { label: string; discount: number } | null {
+  const st = stationById(state, stationId);
+  const lock = exclusiveRight(state, t, state.meta.date);
+  if (!st?.realKey || !lock || lock.stationKey !== st.realKey) return null;
+  const holder = holderOf(state, t.holderId);
+  const until = lock.until ? ` até ${lock.until.slice(5, 7)}/${lock.until.slice(0, 4)}` : '';
+  return {
+    label: `acordo de exclusividade com a ${holder?.name ?? t.holderId}${until}`,
+    discount: rngFor(state.meta.seed, 'parceiro', t.id, st.id).range(0.25, 0.3),
+  };
 }
 
 // dossiê da Pesquisa (seção 8B.3): projeção de audiência e de receita no horário pretendido
@@ -333,7 +349,8 @@ export function openNegotiation(state: GameState, input: { stationId: string; ti
   const rng = rngFor(state.meta.seed, 'neg', input.key);
   const rel = relationOf(state, t.holderId, st.id);
   const terms0 = defaultTerms(t);
-  const vRef = fairValue(state, st.id, t, terms0);
+  const deal = partnerDeal(state, st.id, t);
+  const vRef = Math.max(1, Math.round(fairValue(state, st.id, t, terms0) * (1 - (deal?.discount ?? 0))));
   let pisoMult = rng.range(S.piso[0], S.piso[1]) * (1 - ((rel.score - 50) / 50) * 0.04);
   let patience = S.patience;
   if (distrusts(state, rel)) { pisoMult *= 1.08; patience -= 1; }
@@ -354,7 +371,7 @@ export function openNegotiation(state: GameState, input: { stationId: string; ti
     patienceMax: S.patience,
     argAdj: 0,
     argTagsUsed: [],
-    rivals: lockedFor ? [] : rivalInterest(state, st.id, t, rng),
+    rivals: lockedFor || deal ? [] : rivalInterest(state, st.id, t, rng),
     bluffCaught: false,
     neutral: { E: EXPOSURE[terms0.faixa], X: 0, S: PAYMENT_SAFETY[terms0.parcelas] },
   };
@@ -377,6 +394,7 @@ export function openNegotiation(state: GameState, input: { stationId: string; ti
     rivalMentions: hidden.rivals.map((r) => r.stationName),
     status: 'aberta',
     locked: lockedFor ? lockLabel({ stationName: state.stations.find((s) => s.realKey === lockedFor.stationKey)?.name ?? lockedFor.stationKey.toUpperCase(), until: lockedFor.until }) : null,
+    partner: deal?.label ?? null,
   };
   return { hidden, pub, opening };
 }

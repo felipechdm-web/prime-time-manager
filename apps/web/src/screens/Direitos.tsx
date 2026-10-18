@@ -24,7 +24,7 @@ import { Badge, Bar, Button, Card, Empty, Field, GenreChip, inputClass, Modal, S
 import type { ScreenProps } from './GameShell.tsx';
 
 // ===== tipos das respostas =====
-interface BrowseTitle { id: string; titleBr: string; kind: string; genre: GenreId; country: string | null; year: number | null; episodes: number | null; reference: number; locked: string | null; owned: boolean; negotiation: { id: string; status: string } | null; brStations: string[] }
+interface BrowseTitle { id: string; titleBr: string; kind: string; genre: GenreId; country: string | null; year: number | null; episodes: number | null; reference: number; locked: string | null; partner?: string | null; owned: boolean; negotiation: { id: string; status: string } | null; brStations: string[] }
 interface BrowseHolder { id: string; name: string; category: string | null; representative: { nome: string; cargo: string } | null; relation: number; distrust: boolean; titles: BrowseTitle[] }
 interface Dossier { faixa: BandId; pontosProjetados: [number, number]; receitaPorExibicao: number; exibicoes: number; receitaPotencial: number }
 interface BrowseResp { available: boolean; reason?: string; agendaPoints?: number; cost?: number; holders?: BrowseHolder[]; dossier?: Dossier | null }
@@ -173,6 +173,7 @@ function Vitrine({ gameId, state, autoTitle }: ScreenProps & { autoTitle: string
                   <div className="mt-1.5 flex flex-wrap items-center justify-end gap-1.5">
                     {t.owned && <Badge tone="good">no seu acervo</Badge>}
                     {t.locked && <Badge tone="warn">🔒 {t.locked}</Badge>}
+                    {!t.owned && t.partner && <Badge tone="good">🤝 coberto pelo seu {t.partner}</Badge>}
                     {t.negotiation && <Badge tone={STATUS[t.negotiation.status]?.tone ?? 'neutral'}>{STATUS[t.negotiation.status]?.label}</Badge>}
                     <Button size="sm" variant="ghost" onClick={() => setDossierOf({ title: t, holder: h })}>Dossiê</Button>
                     {!t.owned && (t.negotiation?.status === 'aberta'
@@ -215,6 +216,7 @@ function OpenDialog({ gameId, state, target, onClose }: ScreenProps & { target: 
         <div className="space-y-2 text-sm">
           <p>Produto: <b>{target.title.titleBr}</b>. Preço de referência da Pesquisa: <b>{moneyEra(state.meta.era, target.title.reference)}</b> (aproximado).</p>
           {target.title.locked && <p className="text-warn">Este título está {target.title.locked}. A reunião serve para plantar relacionamento e preferência para a renovação; não há venda agora.</p>}
+          {target.title.partner && <p className="text-good">Coberto pelo seu {target.title.partner}: na TV aberta só você pode licenciar este título. Não há rivais na mesa, e o preço já vem 25% a 30% abaixo do normal. O acordo não inclui a licença de cada título: valor, exibições e prazo saem desta reunião.</p>}
           {target.title.negotiation?.status === 'pausada' && <p className="text-warn">Você pediu tempo nesta negociação. Voltar à mesa custa outra reunião, e um rival pode ter fechado antes.</p>}
           <p className="text-muted">Até 6 rodadas. Propostas muito baixas gastam a paciência do representante; blefes descobertos derrubam o relacionamento por dois anos de jogo.</p>
           {!enough && <p className="text-bad">Faltam pontos de agenda nesta semana.</p>}
@@ -397,6 +399,7 @@ function Mesa({ gameId, state, negotiationId }: ScreenProps & { negotiationId: s
             <p className="mt-2 text-xs text-muted">Rodada {pub.round} de {pub.maxRounds}. Propostas muito baixas gastam o dobro.</p>
             {pub.rivalMentions.length > 0 && <p className="mt-2 text-xs text-warn">Concorrência na mesa: {pub.rivalMentions.join(', ')}.</p>}
             {pub.locked && <p className="mt-2 text-xs text-warn">Produto {pub.locked}: reunião só de relacionamento.</p>}
+            {pub.partner && <p className="mt-2 text-xs text-good">🤝 Coberto pelo seu {pub.partner}: sem concorrência e com desconto de parceiro.</p>}
           </Card>
           {!relation && (
             <Card title="Na mesa (proposta do player)">

@@ -11,6 +11,7 @@ import type { Rng } from './rng.ts';
 import { genreCost, makeContract, makeCtx, makeProgram, makeTalent } from './setup.ts';
 import { avgWeeklyRevenue, getProgram, nextId, npcById, npcByRole, playerStation, pushTimeline, rivals } from './state.ts';
 import { availableAt, catalogGenre, exclusiveRight, holderName, lockLabel, recordDivergence, stationArticle, titleById } from './catalogWorld.ts';
+import { partnerDeal } from './negotiation.ts';
 import type { BandId, CatalogTitleSnap, GameState, GenreId, MarketOffer, Program, RatingAge } from './types.ts';
 import { COPAS, monthOf, yearOf } from './time.ts';
 
@@ -135,6 +136,8 @@ function catalogOffer(state: GameState, kind: MarketOffer['kind'], rng: Rng, opt
   }
   const lock = lockOf(t);
   if (lock) o.lockedBy = { stationKey: lock.stationKey, stationName: stationNameByKey(state, lock.stationKey), until: lock.until };
+  const deal = partnerDeal(state, ps.id, t);
+  if (deal) o.partner = deal.label;
   return o;
 }
 
