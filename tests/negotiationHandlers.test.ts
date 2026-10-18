@@ -164,6 +164,19 @@ test('título com exclusividade de outra emissora: reunião só de relacionament
   await assert.rejects(() => negotiationCloseHandler(ctx, { negotiationId: o.negotiationId }), /acordo/);
 });
 
+test('reunião sem o segredo gravado (versão antiga): o motor recria o mesmo segredo e a rodada segue', async () => {
+  const store = storeWithCatalog();
+  const ctx = ctxWith(store, null);
+  const { gameId } = await createGame(ctx, NEW);
+  const o = await negotiationOpenHandler(ctx, { gameId, titleId: 'friends' }) as { negotiationId: string; pub: NegPublic };
+  const [orig] = await store.select('negotiation_secrets', { negotiation_id: o.negotiationId });
+  await store.remove('negotiation_secrets', { negotiation_id: o.negotiationId });
+  const r = await negotiationTurnHandler(ctx, { negotiationId: o.negotiationId, terms: { valor: 1 } }) as { decision: { type: string } };
+  assert.ok(r.decision.type, 'a rodada roda sem "Negociação sem estado interno"');
+  const [rebuilt] = await store.select('negotiation_secrets', { negotiation_id: o.negotiationId });
+  assert.equal((rebuilt.hidden_state as { piso: number }).piso, (orig.hidden_state as { piso: number }).piso, 'mesmo piso, mesma chave');
+});
+
 test('vamos pensar, levantar da mesa, dono da partida, partida sem catálogo e concorrência (estrutura)', async () => {
   const store = storeWithCatalog();
   const ctx = ctxWith(store, null);

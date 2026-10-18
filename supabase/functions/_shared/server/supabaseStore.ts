@@ -3,6 +3,9 @@
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2.117.2';
 import type { GameRow, GameStore, SelectOpts } from '../game/types.ts';
 
+// tabelas sem a coluna id (chave em outra coluna): na inserção não dá para pedir o id de volta
+const NO_ID_TABLES = new Set(['negotiation_secrets', 'holder_relationships', 'club_fanbase']);
+
 export class SupabaseStore implements GameStore {
   constructor(private db: SupabaseClient) {}
 
@@ -27,6 +30,11 @@ export class SupabaseStore implements GameStore {
     if (!rows.length) return [];
     const out: Record<string, unknown>[] = [];
     for (let i = 0; i < rows.length; i += 200) {
+      if (NO_ID_TABLES.has(table)) {
+        const { error } = await this.db.from(table).insert(rows.slice(i, i + 200));
+        if (error) throw new Error(`${table} insert: ${error.message}`);
+        continue;
+      }
       const { data, error } = await this.db.from(table).insert(rows.slice(i, i + 200)).select('id');
       if (error) throw new Error(`${table} insert: ${error.message}`);
       out.push(...((data as Record<string, unknown>[]) ?? []));

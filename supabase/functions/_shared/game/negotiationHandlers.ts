@@ -22,7 +22,7 @@ import { addDays } from '../engine/time.ts';
 import { diffPatch, flushInbox, loadGame, saveGame, snapshot } from './handlers.ts';
 import { allowedNumbers, budgetOk, callLLM, contextBlock, scrubNumbers } from './mestre.ts';
 import { decisionLines, LEAVE_LINES, openingLines, PAUSE_LINES, TENDER_ENVELOPE_LINES, tenderFeedbackLines, tenderOpeningLines, termsText } from './negotiationTexts.ts';
-import { evaluatePitch, normalizeOffer, openTenderMeeting, submitTenderBid, TENDER_REASONS } from '../engine/tenders.ts';
+import { evaluatePitch, normalizeOffer, openTenderMeeting, submitTenderBid, TENDER_REASONS, tenderHidden } from '../engine/tenders.ts';
 import type { TenderHidden, TenderMeetingPub } from '../engine/tenders.ts';
 import type { TenderOffer, TenderPublic } from '../engine/types.ts';
 import { resolveDueTenders } from './tenderResolve.ts';
@@ -168,8 +168,30 @@ async function loadNegotiation(ctx: HandlerCtx, negotiationId: string): Promise<
   if (!n) throw new HttpError(404, 'Negociação não encontrada');
   const row = await loadGame(ctx, String(n.game_id));
   const [sec] = await ctx.store.select('negotiation_secrets', { negotiation_id: negotiationId });
-  if (!sec) throw new HttpError(500, 'Negociação sem estado interno');
-  return { n, row, pub: n.public_state as NegPublic, hidden: sec.hidden_state as NegHidden };
+  if (sec) return { n, row, pub: n.public_state as NegPublic, hidden: sec.hidden_state as NegHidden };
+  // reunião aberta sem o segredo (versão anterior da gravação falhava nesta tabela): o motor recria o segredo
+  // com a mesma chave e a paciência que a reunião já gastou, grava e segue
+  const hidden = rebuildSecret(row.state, n);
+  if (!hidden) throw new HttpError(500, 'Negociação sem estado interno');
+  const now = ctx.now().toISOString();
+  await ctx.store.insert('negotiation_secrets', [{ negotiation_id: negotiationId, hidden_state: hidden, created_at: now, updated_at: now }]);
+  return { n, row, pub: n.public_state as NegPublic, hidden: hidden as unknown as NegHidden };
+}
+
+function rebuildSecret(state: GameState, n: Row): NegHidden | TenderHidden | null {
+  const pub = n.public_state as { kind?: string; patiencePct?: number };
+  const left = (max: number) => Math.max(1, Math.round(((pub.patiencePct ?? 100) / 100) * max));
+  if (n.kind === 'concorrencia') {
+    const t = state.tenders?.find((x) => x.id === String(n.product_ref));
+    if (!t) return null;
+    const h = tenderHidden(state, t);
+    return { ...h, planTags: [], patience: left(h.patienceMax) };
+  }
+  const o = openNegotiation(state, { stationId: String(n.station_id), titleId: String(n.product_ref), key: String(n.id) });
+  if ('error' in o) return null;
+  const hidden = { ...o.hidden, patience: left(o.hidden.patienceMax) };
+  if (n.kind === 'relacionamento') hidden.rivals = [];
+  return hidden;
 }
 
 async function persistNegotiation(ctx: HandlerCtx, id: string, pub: NegPublic, hidden: NegHidden | null, extra: Row = {}): Promise<void> {
